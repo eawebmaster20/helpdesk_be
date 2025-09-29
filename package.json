@@ -7,8 +7,11 @@
     "dev": "nodemon src/index.ts",
     "migrate": "psql -U postgres -d helpdesk -p 5436 -f schema.sql",
     "build": "tsc",
-    "start-built": "node dist/index.js",
-    "start": "ts-node src/index.ts"
+    "start-built": "node index.js",
+    "start": "ts-node src/index.ts",
+    "dockercompose": "docker-compose up -d --build",
+    "docker-build": "docker build -t api_server .",
+    "docker-publish": "docker tag api_server eawebmaster20/api_server:latest && docker push eawebmaster20/api_server:latest"
   },
   "keywords": [
     "helpdesk",
@@ -19,9 +22,12 @@
   "license": "MIT",
   "dependencies": {
     "@types/uuid": "^10.0.0",
+    "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^7.0.6",
     "pg": "^8.16.3",
     "ts-node": "^10.9.2",
     "uuid": "^11.1.0"
@@ -29,7 +35,9 @@
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.11.30",
+    "@types/nodemailer": "^7.0.1",
     "@types/pg": "^8.15.5",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.4.5"
