@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { authenticate } from "../middlewares/authenticate.utils";
 
 const router = Router();
 
@@ -8,10 +9,6 @@ router.post("/sso/callback", (req: Request, res: Response) => {
   res.status(501).json({ message: "Not implemented" });
 });
 
-// GET /me
-router.get("/me", (req: Request, res: Response) => {
-  // Return user profile & permissions
-  res.status(501).json({ message: "Not implemented" });
-});
+router.post("/login", authenticate);
 
 export default router;
