@@ -11,7 +11,8 @@ import webhooksRoutes from "./routes/webhooks.routes";
 import departmentsRoutes from "./routes/departments.routes";
 import usersRoutes from "./routes/users.routes";
 import cors from "cors";
-import { db } from "./db/index";
+import { db, initializeDatabase } from "./db/index";
+import { sendPasswordSetupEmail, sendTestEmail } from "./utils/email";
 
 const app: Application = express();
 app.use(express.json({ limit: "10mb" }));
@@ -63,6 +64,23 @@ app.get("/health", async (req, res) => {
           ? "Database connection failed"
           : error.message,
     });
+  }
+});
+
+// test email
+app.get("/test-email", async (req: Request, res: Response) => {
+  try {
+    // Simulate sending a test email
+    console.log("Sending test email...", req.body.to);
+    const emailSent = await sendTestEmail(req.body.to);
+    if (emailSent) {
+      res.json({ message: "Test email sent successfully" });
+    } else {
+      res.status(500).json({ message: "Failed to send test email" });
+    }
+  } catch (error) {
+    console.error("Error sending test email:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -118,23 +136,38 @@ const startServer = async () => {
       );
       process.exit(1);
     }
+    // app.listen(PORT, () => {
+    //   console.log("\n Server is running!");
+    //   console.log(` Health check: http://localhost:${PORT}//api/health`);
+    //   console.log(` API base URL: http://localhost:${PORT}/api/v1`);
+    //   console.log(` CORS enabled for: ${process.env.FRONTEND_URL}`);
+    //   console.log(` Environment: ${process.env.NODE_ENV}\n`);
+    // });
 
     // Initialize database tables
-    // console.log("🏗️  Initializing database tables...");
-    // await initializeDatabase();
-
-    // Start server
-    app.listen(PORT, () => {
-      console.log("\n Server is running!");
-      console.log(` HTTP server: http://localhost:${PORT}`);
-      console.log(` Health check: http://localhost:${PORT}//api/health`);
-      console.log(` API base URL: http://localhost:${PORT}/api/v1`);
-      console.log(` CORS enabled for: ${process.env.FRONTEND_URL}`);
-      console.log(` Environment: ${process.env.NODE_ENV}\n`);
-    });
+    console.log("🏗️  Initializing database tables...");
+    initializeDatabase()
+      .then(() => {
+        console.log("✅ Database tables initialized");
+        // Start server
+        app.listen(PORT, () => {
+          console.log("\n Server is running!");
+          console.log(` Health check: http://localhost:${PORT}//api/health`);
+          console.log(` API base URL: http://localhost:${PORT}/api/v1`);
+          console.log(` CORS enabled for: ${process.env.FRONTEND_URL}`);
+          console.log(` Environment: ${process.env.NODE_ENV}\n`);
+        });
+      })
+      .catch((error) => {
+        console.error("❌ Failed to start server:", error);
+        process.exit(1);
+      })
+      .finally(() => {
+        console.log("🔚 Server startup process finished");
+      });
   } catch (error) {
-    console.error("❌ Failed to start server:", error);
-    process.exit(1);
+    // console.error("❌ Failed to start server:", error);
+    // process.exit(1);
   }
 };
 
