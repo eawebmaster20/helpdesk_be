@@ -53,12 +53,12 @@ export const sendTestEmail = async (to: string): Promise<boolean> => {
 
 // Send password setup email
 export const sendPasswordSetupEmail = async (
-  user: User,
+  email: string,
   resetToken: string
 ): Promise<boolean> => {
   const frontendUrl = process.env.FRONTEND_URL;
   if (!transporter && !frontendUrl) {
-    console.log(`Password setup email would be sent to ${user.email}`);
+    console.log(`Password setup email would be sent to ${email}`);
     return false;
   }
 
@@ -68,12 +68,12 @@ export const sendPasswordSetupEmail = async (
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
-      to: user.email,
+      to: email,
       subject: "Set Up Your Service Desk Account Password",
       html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <h2 style="color: #4F46E5;">Welcome to Subscription App!</h2>
-                <p>Hello ${user.name},</p>
+                <p>Hello Brightest star,</p>
                 <p>Your account has been created successfully. Please click the button below to set up your password:</p>
                 
                 <div style="text-align: center; margin: 30px 0;">
@@ -101,9 +101,9 @@ export const sendPasswordSetupEmail = async (
             `,
       text: `
                 Welcome to Subscription App!
-                
-                Hello ${user.name},
-                
+
+                Hello Brightest star,
+
                 Your account has been created successfully. Please visit the following link to set up your password:
                 
                 ${setupUrl}
@@ -117,7 +117,7 @@ export const sendPasswordSetupEmail = async (
     };
 
     await transporter!.sendMail(mailOptions);
-    console.log(`Password setup email sent to ${user.email}`);
+    console.log(`Password setup email sent to ${email}`);
     return true;
   } catch (error) {
     console.error("Failed to send password setup email:", error);

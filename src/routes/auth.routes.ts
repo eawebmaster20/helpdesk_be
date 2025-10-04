@@ -1,5 +1,8 @@
 import { Router, Request, Response } from "express";
-import { authenticate } from "../middlewares/authenticate.utils";
+import {
+  authenticate,
+  authenticateSSO,
+} from "../middlewares/authenticate.utils";
 
 const router = Router();
 
@@ -10,5 +13,6 @@ router.post("/sso/callback", (req: Request, res: Response) => {
 });
 
 router.post("/login", authenticate);
+router.get("/sso", authenticateSSO);
 
 export default router;
