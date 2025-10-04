@@ -136,35 +136,35 @@ const startServer = async () => {
       );
       process.exit(1);
     }
-    // app.listen(PORT, () => {
-    //   console.log("\n Server is running!");
-    //   console.log(` Health check: http://localhost:${PORT}//api/health`);
-    //   console.log(` API base URL: http://localhost:${PORT}/api/v1`);
-    //   console.log(` CORS enabled for: ${process.env.FRONTEND_URL}`);
-    //   console.log(` Environment: ${process.env.NODE_ENV}\n`);
-    // });
+    app.listen(PORT, () => {
+      console.log("\n Server is running!");
+      console.log(` Health check: http://localhost:${PORT}//api/health`);
+      console.log(` API base URL: http://localhost:${PORT}/api/v1`);
+      console.log(` CORS enabled for: ${process.env.FRONTEND_URL}`);
+      console.log(` Environment: ${process.env.NODE_ENV}\n`);
+    });
 
-    // Initialize database tables
-    console.log("🏗️  Initializing database tables...");
-    initializeDatabase()
-      .then(() => {
-        console.log("✅ Database tables initialized");
-        // Start server
-        app.listen(PORT, () => {
-          console.log("\n Server is running!");
-          console.log(` Health check: http://localhost:${PORT}//api/health`);
-          console.log(` API base URL: http://localhost:${PORT}/api/v1`);
-          console.log(` CORS enabled for: ${process.env.FRONTEND_URL}`);
-          console.log(` Environment: ${process.env.NODE_ENV}\n`);
-        });
-      })
-      .catch((error) => {
-        console.error("❌ Failed to start server:", error);
-        process.exit(1);
-      })
-      .finally(() => {
-        console.log("🔚 Server startup process finished");
-      });
+    // // Initialize database tables
+    // console.log("🏗️  Initializing database tables...");
+    // initializeDatabase()
+    //   .then(() => {
+    //     console.log("✅ Database tables initialized");
+    //     // Start server
+    //     app.listen(PORT, () => {
+    //       console.log("\n Server is running!");
+    //       console.log(` Health check: http://localhost:${PORT}//api/health`);
+    //       console.log(` API base URL: http://localhost:${PORT}/api/v1`);
+    //       console.log(` CORS enabled for: ${process.env.FRONTEND_URL}`);
+    //       console.log(` Environment: ${process.env.NODE_ENV}\n`);
+    //     });
+    //   })
+    //   .catch((error) => {
+    //     console.error("❌ Failed to start server:", error);
+    //     process.exit(1);
+    //   })
+    //   .finally(() => {
+    //     console.log("🔚 Server startup process finished");
+    //   });
   } catch (error) {
     // console.error("❌ Failed to start server:", error);
     // process.exit(1);
