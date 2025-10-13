@@ -138,7 +138,7 @@ const startServer = async () => {
     }
     app.listen(PORT, () => {
       console.log("\n Server is running!");
-      console.log(` Health check: http://localhost:${PORT}//api/health`);
+      console.log(` Health check: http://localhost:${PORT}/api/health`);
       console.log(` API base URL: http://localhost:${PORT}/api/v1`);
       console.log(` CORS enabled for: ${process.env.FRONTEND_URL}`);
       console.log(` Environment: ${process.env.NODE_ENV}\n`);
