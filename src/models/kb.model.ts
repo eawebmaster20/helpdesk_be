@@ -20,7 +20,7 @@ export async function updateKBArticleModel(
   return db.query(
     `UPDATE kb_articles SET
       title = COALESCE($1, title),
-      body = COALESCE($2, body),
+      content = COALESCE($2, body),
       tags = COALESCE($3, tags),
       updated_at = NOW()
     WHERE id = $4 RETURNING *`,
@@ -34,12 +34,12 @@ export async function getKBArticlesModel() {
 
 export async function createKBArticleModel(
   title: string,
-  body: string,
+  content: string,
   tags: string[],
   createdBy: string
 ) {
   return db.query(
-    `INSERT INTO kb_articles (title, body, tags, created_by) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [title, body, tags, createdBy]
+    `INSERT INTO kb_articles (title, content, tags, created_by) VALUES ($1, $2, $3, $4) RETURNING *`,
+    [title, content, tags, createdBy]
   );
 }
