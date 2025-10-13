@@ -5,6 +5,7 @@ import {
   generateSecureToken,
   isValidEmail,
 } from "./jwt.utils";
+import { jwtDecode } from "jwt-decode";
 import * as adal from "adal-node";
 
 export async function authenticate(req: any, res: any, next: any) {
@@ -57,39 +58,70 @@ export const adConfig = {
 export async function authenticateSSO(req: any, res: any, next: any) {
   const authorityUrl = `${adConfig.authorityHostUrl}/${adConfig.tenant}`;
   const context = new adal.AuthenticationContext(authorityUrl);
-  // context.acquireTokenWithClientCredentials(
-  //   adConfig.resource,
-  //   adConfig.clientId,
-  //   adConfig.clientSecret,
-  //   (err, tokenResponse) => {
-  //     if (err) {
-  //       console.log("Failed to acquire token:", err);
-  //       // return res.json({ message: "SSO Authentication failed" });
-  //     } else {
-  //       const accessToken = tokenResponse;
-  //       console.log("Access Token:", accessToken);
-  //       return res.status(200);
-  //       // .json({ message: "SSO Authentication successful" });
-  //       // You can use the accessToken to authenticate API requests
-  //     }
-  //   }
-  // );
-  // Placeholder for SSO authentication logic
-  // Implement OIDC SSO authentication (Azure AD/Google Workspace) here
-  context.acquireTokenWithUsernamePassword(
+  context.acquireTokenWithClientCredentials(
     adConfig.resource,
-    adConfig.username,
-    adConfig.password,
     adConfig.clientId,
+    adConfig.clientSecret,
     (err, tokenResponse) => {
       if (err) {
         console.log("Failed to acquire token:", err);
-        return res.status(401).json({ message: "SSO Authentication failed" });
+        // return res.json({ message: "SSO Authentication failed" });
       } else {
-        console.log("Access Token:", tokenResponse);
-        return res.json({ message: "SSO Authentication successful" });
+        const accessToken = tokenResponse as adal.TokenResponse;
+        console.log("Access Token:", accessToken);
+        // jwtDecode((accessToken as any).accessToken);
+        return res.status(200).json({
+          message: "SSO Authentication successful",
+          value: tokenResponse,
+        });
+        // .json({ message: "SSO Authentication successful" });
         // You can use the accessToken to authenticate API requests
       }
     }
   );
+  // context.acquireTokenWithUsernamePassword(
+  //   adConfig.resource,
+  //   adConfig.username,
+  //   // req.body.password,
+  //   // req.body.username,
+  //   adConfig.password,
+  //   adConfig.clientId,
+  //   (err, tokenResponse) => {
+  //     if (err) {
+  //       console.log("Failed to acquire token:", err);
+  //       return res.status(401).json({ message: "SSO Authentication failed" });
+  //     } else {
+  //       console.log("Access Token:");
+  //       return res.json({
+  //         code: 200,
+  //         message: "SSO Authentication successful",
+  //         value: tokenResponse,
+  //       });
+  //       // You can use the accessToken to authenticate API requests
+  //     }
+  //   }
+  // );
+}
+
+export async function logOutSSO(req: any, res: any, next: any) {
+  // Destroy session or clear user info if using sessions
+  if (req.session) {
+    req.session.destroy(() => {
+      // Redirect to Azure AD logout endpoint
+      const tenant = adConfig.tenant;
+      const postLogoutRedirectUri = process.env.AZURE_LOGOUT_REDIRECT || "";
+      const logoutUrl = `https://login.microsoftonline.com/${tenant}/oauth2/logout?post_logout_redirect_uri=${encodeURIComponent(
+        postLogoutRedirectUri
+      )}`;
+      return res.redirect(logoutUrl);
+    });
+  } else {
+    // If not using sessions, just redirect
+    const tenant = adConfig.tenant;
+    const postLogoutRedirectUri = process.env.AZURE_LOGOUT_REDIRECT || "";
+    const logoutUrl = `https://login.microsoftonline.com/${tenant}/oauth2/logout?post_logout_redirect_uri=${encodeURIComponent(
+      postLogoutRedirectUri
+    )}`;
+    return res.redirect(logoutUrl);
+  }
 }
