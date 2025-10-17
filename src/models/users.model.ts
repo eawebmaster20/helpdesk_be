@@ -16,8 +16,8 @@ export async function insertUserModel(
   departmentId?: string
 ) {
   return db.query(
-    `INSERT INTO users (name, email, password, role, department_id) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [name, email, password, role, departmentId]
+    `INSERT INTO users (name, email, role, department_id) VALUES ($1, $2, $3, $4) RETURNING *`,
+    [name, email, role, departmentId]
   );
 }
 
