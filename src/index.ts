@@ -4,6 +4,7 @@ import express, { Application, Request, Response } from "express";
 
 import authRoutes from "./routes/auth.routes";
 import ticketsRoutes from "./routes/tickets.routes";
+import ticketCategoriesRoutes from "./routes/ticket-category.routes";
 import approvalsRoutes from "./routes/approvals.routes";
 import adminRoutes from "./routes/admin.routes";
 import kbRoutes from "./routes/kb.routes";
@@ -33,6 +34,7 @@ app.get("/", (req: Request, res: Response) => {
 // API routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/tickets", ticketsRoutes);
+app.use("/api/v1/ticket-categories", ticketCategoriesRoutes);
 app.use("/api/v1/approvals", approvalsRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/kb", kbRoutes);
@@ -166,9 +168,15 @@ const startServer = async () => {
     //     console.log("🔚 Server startup process finished");
     //   });
   } catch (error) {
-    // console.error("❌ Failed to start server:", error);
-    // process.exit(1);
+    console.error("❌ Failed to start server:", error);
+    process.exit(1);
   }
 };
 
 startServer();
+
+// GL
+// (exceptional cases)Vat should be applied on risk instead of policy. in the event where a policy has multiple risks with different vat rates, the vat amount will be incorrect if applied on the total policy premium.
+// invoice processing work flow
+// GRA Vat (input tax) to reduce output tax on vat return
+// GRA vat to be claimed on purchases
