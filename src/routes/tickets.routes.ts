@@ -9,12 +9,16 @@ import {
   assignTicket,
   transitionTicket,
   linkTicket,
+  getTicketsByUser
 } from "../controllers/tickets.controller";
 
 const router = Router();
 
 // GET /tickets
 router.get("/", getTickets);
+
+// GET /tickets/:user by user
+router.get("/user/:userId", getTicketsByUser);
 
 // POST /tickets
 router.post("/", createTicket);
