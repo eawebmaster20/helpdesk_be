@@ -4,6 +4,8 @@ import {
   addTicketAttachmentModel,
   assignTicketModel,
 } from "../models/ticket.model";
+import { Request, Response } from "express";
+import { db } from "../db";
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
@@ -155,8 +157,6 @@ export async function linkTicket(req: Request, res: Response) {
     res.status(500).json({ message: "Database error", error: err });
   }
 }
-import { Request, Response } from "express";
-import { db } from "../db";
 
 export async function getTickets(req: Request, res: Response) {
   try {
@@ -170,17 +170,18 @@ export async function getTickets(req: Request, res: Response) {
 }
 
 export async function createTicket(req: Request, res: Response) {
-  const { title, description, departmentId, createdBy, priority } = req.body;
-  if (!title || !description || !departmentId || !createdBy || !priority) {
+  const { title, description, departmentId, createdBy, priority, categoryId, attachments } = req.body;
+  if (!title || !departmentId || !createdBy || !priority || !categoryId ) {
     return res.status(400).json({
       message:
-        "title, description, departmentId, createdBy, and priority are required",
+        "title, departmentId, createdBy, priority, category are required",
+        value:req.body
     });
   }
   try {
     const result = await db.query(
-      `INSERT INTO tickets (title, description, department_id, created_by, status, priority) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [title, description, departmentId, createdBy, "New", priority]
+      `INSERT INTO tickets (title, description, department_id, created_by, status, priority, category_id, attachments) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [title, description, departmentId, createdBy, "New", priority, categoryId, attachments || []]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -195,9 +196,15 @@ export async function getTicketById(req: Request, res: Response) {
     if (result.rowCount === 0) {
       return res.status(404).json({ message: "Ticket not found" });
     }
-    res.json(result.rows[0]);
+    res.json({
+      message: '',
+      data: result.rows[0],
+      status: 'success'
+    });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
 }
+
+
 // ...add more ticket-related controller functions as needed...
