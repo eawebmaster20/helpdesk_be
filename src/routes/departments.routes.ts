@@ -8,12 +8,12 @@ import {
 const router = Router();
 
 // GET /departments
-router.get("/departments", getDepartments);
+router.get("/", getDepartments);
 
 // POST /departments
-router.post("/departments", createDepartment);
+router.post("/", createDepartment);
 
 // PATCH /departments/:id
-router.patch("/departments/:id", updateDepartment);
+router.patch("/:id", updateDepartment);
 
 export default router;
