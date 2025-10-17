@@ -8,12 +8,12 @@ import {
 const router = Router();
 
 // GET /users
-router.get("/users", getUsers);
+router.get("/", getUsers);
 
 // POST /users
-router.post("/users", createUser);
+router.post("/", createUser);
 
 // PATCH /users/:id
-router.patch("/users/:id", updateUser);
+router.patch("/:id", updateUser);
 
 export default router;
