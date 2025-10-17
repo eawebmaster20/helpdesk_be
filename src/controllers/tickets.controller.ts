@@ -163,11 +163,33 @@ export async function getTickets(req: Request, res: Response) {
     const result = await db.query(
       "SELECT * FROM tickets ORDER BY created_at DESC"
     );
-    res.json(result.rows);
+    res.json({
+      message: '',
+      data: result.rows,
+      status: 'success'
+    });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
 }
+
+export async function getTicketsByUser(req: Request, res: Response) {
+  const { userId } = req.params;
+  try {
+    const result = await db.query(
+      "SELECT * FROM tickets WHERE created_by = $1 ORDER BY created_at DESC",
+      [userId]
+    );
+    res.json({
+      message: '',
+      data: result.rows,
+      status: 'success'
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Database error", error: err });
+  }
+}
+
 
 export async function createTicket(req: Request, res: Response) {
   const { title, description, departmentId, createdBy, priority, categoryId, attachments } = req.body;
