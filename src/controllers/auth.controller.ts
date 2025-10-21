@@ -9,22 +9,110 @@ import { verify } from "crypto";
 
 import { Client, Attribute, Change } from "ldapts";
 import { db } from "../db";
+import { parseLDAPDN } from "../utils/ldap";
+import { generateUserToken } from "../middlewares/jwt.utils";
 
 export async function login(req: Request, res: Response) {
   try {
-    const user = await ldapAuthenticate(req, res, () => {});
-    console.log(user);
-    // const result = await db.query("SELECT * FROM users WHERE email = $1 OR userPrincipalName = $2 OR name = $3", [
-    //   user.mail,
-    //   user.userPrincipalName,
-    //   user.name,
-    // ]);
-    if (!user) {
-      return res.status(401).json({ message: "Unauthorized" });
+    const ldapUser: any = await ldapAuthenticate(req, res);
+    
+    if (!ldapUser || !ldapUser.dn) {
+      return res.status(401).json({ message: "LDAP authentication failed", status: 'error' });
     }
-    res.status(200).json({ message: "Login successful", user });
+    
+    // Parse LDAP DN to get user information
+    const payload = parseLDAPDN(ldapUser.dn);
+    const userEmail = ldapUser.userPrincipalName || ldapUser.mail || '';
+    
+    // Check if user exists in database
+    const existingUserResult = await db.query(
+      "SELECT * FROM users WHERE email = $1",
+      [userEmail]
+    );
+    
+    let dbUser;
+    if (existingUserResult.rows.length === 0) {
+      // User doesn't exist, create new user
+      let departmentId = null;
+      
+      // Find department ID by matching department name (case-insensitive)
+      if (payload.department) {
+        const departmentResult = await db.query(
+          "SELECT id FROM departments WHERE LOWER(name) = LOWER($1)",
+          [payload.department]
+        );
+        
+        if (departmentResult.rows.length > 0) {
+          departmentId = departmentResult.rows[0].id;
+        }
+      }
+      
+      // Create new user
+      const newUserResult = await db.query(
+        `INSERT INTO users (name, email, role, department_id) 
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [payload.name, userEmail, '0', departmentId]
+      );
+      
+      dbUser = newUserResult.rows[0];
+    } else {
+      // User exists, use existing user data
+      dbUser = existingUserResult.rows[0];
+    }
+    
+    // Fetch user with department data (replace department_id with actual department object)
+    const userWithDeptResult = await db.query(`
+      SELECT 
+        u.id,
+        u.name,
+        u.email,
+        u.role,
+        u.created_at,
+        u.updated_at,
+        d.id as department_id,
+        d.name as department_name,
+        d.head_id as department_head_id
+      FROM users u
+      LEFT JOIN departments d ON u.department_id = d.id
+      WHERE u.id = $1
+    `, [dbUser.id]);
+    
+    const userWithDept = userWithDeptResult.rows[0];
+    
+    // Format user object with department data
+    const formattedUser = {
+      id: userWithDept.id,
+      name: userWithDept.name,
+      email: userWithDept.email,
+      role: userWithDept.role,
+      created_at: userWithDept.created_at,
+      updated_at: userWithDept.updated_at,
+      department: userWithDept.department_id ? {
+        id: userWithDept.department_id,
+        name: userWithDept.department_name,
+        head_id: userWithDept.department_head_id
+      } : null
+    };
+    
+    // Generate JWT token
+    const token = generateUserToken({
+      id: dbUser.id,
+      email: dbUser.email
+    });
+    
+    // Return success response with user data and token
+    res.status(200).json({ 
+      message: "Login successful", 
+      data: {
+        user: formattedUser,
+        token: token,
+      }, 
+      status: 'success' 
+    });
+    
   } catch (err) {
-    res.status(500).json({ message: "Database error", error: err });
+    // console.error('Login error:', err);
+    res.status(500).json({ message: "Authentication error", error: err, status: 'error' });
   }
 }
 
@@ -57,7 +145,7 @@ export async function updateUser(req: Request, res: Response) {
   }
 }
 
-async function ldapAuthenticate(req: any, res: any, next: any) {
+async function ldapAuthenticate(req: any, res: any) {
   // console.log("login for " + req.body.username);
   let client;
   try {
@@ -83,16 +171,8 @@ async function ldapAuthenticate(req: any, res: any, next: any) {
     const userClient = new Client({ url: process.env.LDAP_URL || "" });
     await userClient.bind(userDN, req.body.password);
     return searchResult.searchEntries[0];
-    // res
-    //   .status(200)
-    //   .json({
-    //     message: "LDAP authentication successful",
-    //     value: searchResult.searchEntries[0],
-    //   });
   } catch (error) {
-    // console.error("LDAP bind error:", error);
-    next(error);
-    return res.status(500).json({ message: "authentication failed" });
+    return error;
   } finally {
     if (client) {
       await client.unbind();
