@@ -21,13 +21,37 @@ CREATE TABLE IF NOT EXISTS departments (
 -- Tickets table
 CREATE TABLE IF NOT EXISTS tickets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ticket_number VARCHAR(20) UNIQUE NOT NULL,
   title VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
   department_id UUID,
   created_by UUID,
+  category_id UUID,
   status VARCHAR(32) NOT NULL,
   priority VARCHAR(16) NOT NULL,
+  attachments TEXT[],
   assignee_id UUID,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Ticket Counter table (for generating sequential ticket numbers)
+CREATE TABLE IF NOT EXISTS ticket_counter (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  current_number INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Insert initial counter record if it doesn't exist
+INSERT INTO ticket_counter (id, current_number) 
+SELECT 1, 0 
+WHERE NOT EXISTS (SELECT 1 FROM ticket_counter WHERE id = 1);
+
+-- Categories table
+CREATE TABLE IF NOT EXISTS categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -95,4 +119,15 @@ CREATE TABLE IF NOT EXISTS kb_articles (
   created_by UUID NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Ticket Activities table (Audit trail for all ticket actions)
+CREATE TABLE IF NOT EXISTS ticket_activities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+  type VARCHAR(32) NOT NULL CHECK (type IN ('status', 'comment', 'assignment', 'attachment')),
+  user_id UUID NOT NULL REFERENCES users(id),
+  action TEXT NOT NULL,
+  comment TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
 );
