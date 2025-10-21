@@ -14,6 +14,7 @@ import usersRoutes from "./routes/users.routes";
 import cors from "cors";
 import { db, initializeDatabase } from "./db/index";
 import { sendPasswordSetupEmail, sendTestEmail } from "./utils/email";
+import { Server} from "socket.io";
 
 const app: Application = express();
 app.use(express.json({ limit: "10mb" }));
@@ -175,8 +176,8 @@ const startServer = async () => {
 
 startServer();
 
-// GL
-// (exceptional cases)Vat should be applied on risk instead of policy. in the event where a policy has multiple risks with different vat rates, the vat amount will be incorrect if applied on the total policy premium.
+// GL && UAT
+// (exceptional cases)Vat should be applied on risk instead of policy. in the event where a policy has multiple risks with different vat rates or some risks are zero rate, the vat amount will be incorrect if applied on the total policy premium.
 // invoice processing work flow
 // GRA Vat (input tax) to reduce output tax on vat return
 // GRA vat to be claimed on purchases
