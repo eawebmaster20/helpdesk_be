@@ -25,7 +25,7 @@ export const db = new Pool({
 
 export async function initializeDatabase(): Promise<void> {
   const schema = fs.readFileSync(
-    path.join(__dirname, "../db/schema.sql"),
+    path.join(__dirname, "schema.sql"),
     "utf-8"
   );
   try {
