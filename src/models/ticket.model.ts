@@ -20,6 +20,7 @@ export interface User {
 
 export interface Ticket {
   id: string;
+  ticketNumber: string;
   title: string;
   description: string;
   departmentId: string;
@@ -55,15 +56,18 @@ export async function getTicketsModel() {
 }
 
 export async function createTicketModel(
+  ticketNumber: string,
   title: string,
   description: string,
   departmentId: string,
   createdBy: string,
-  priority: string
+  priority: string,
+  categoryId?: string,
+  attachments?: string[]
 ) {
   return db.query(
-    `INSERT INTO tickets (title, description, department_id, created_by, status, priority) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [title, description, departmentId, createdBy, "New", priority]
+    `INSERT INTO tickets (ticket_number, title, description, department_id, created_by, status, priority, category_id, attachments) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [ticketNumber, title, description, departmentId, createdBy, "New", priority, categoryId, attachments || []]
   );
 }
 
@@ -150,4 +154,31 @@ export async function linkTicketModel(
     `INSERT INTO ticket_links (ticket_id, target_id, type) VALUES ($1, $2, $3) RETURNING *`,
     [id, targetId, type]
   );
+}
+
+// Ticket Activity tracking functions
+export async function addTicketActivityModel(
+  ticketId: string,
+  type: 'status' | 'comment' | 'assignment' | 'attachment',
+  userId: string,
+  action: string,
+  comment?: string
+) {
+  return db.query(
+    `INSERT INTO ticket_activities (ticket_id, type, user_id, action, comment) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [ticketId, type, userId, action, comment]
+  );
+}
+
+export async function getTicketActivitiesModel(ticketId: string) {
+  return db.query(`
+    SELECT 
+      ta.*,
+      u.name as user_name,
+      u.email as user_email
+    FROM ticket_activities ta
+    LEFT JOIN users u ON ta.user_id = u.id
+    WHERE ta.ticket_id = $1
+    ORDER BY ta.created_at DESC
+  `, [ticketId]);
 }

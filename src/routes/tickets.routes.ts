@@ -9,7 +9,8 @@ import {
   assignTicket,
   transitionTicket,
   linkTicket,
-  getTicketsByUser
+  getTicketsByUser,
+  getTicketActivities
 } from "../controllers/tickets.controller";
 
 const router = Router();
@@ -22,6 +23,9 @@ router.get("/user/:userId", getTicketsByUser);
 
 // POST /tickets
 router.post("/", createTicket);
+
+// GET /tickets/:id/activities
+router.get("/:id/activities", getTicketActivities);
 
 // GET /tickets/:id
 router.get("/:id", getTicketById);
