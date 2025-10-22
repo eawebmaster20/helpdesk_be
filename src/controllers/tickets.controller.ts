@@ -367,10 +367,10 @@ export async function getTicketsByUser(req: Request, res: Response) {
 
 export async function createTicket(req: Request, res: Response) {
   const { title, description, departmentId, createdBy, priority, categoryId, attachments } = req.body;
-  if (!title || !departmentId || !createdBy || !priority || !categoryId ) {
+  if (!title || !createdBy || !priority || !categoryId ) {
     return res.status(400).json({
       message:
-        "title, departmentId, createdBy, priority, category are required",
+        "title, createdBy, priority, category are required",
         value:req.body
     });
   }
