@@ -35,13 +35,165 @@ export function setupTicketSocketHandlers(io: Server) {
   });
 
   io.on("connection", (socket: AuthenticatedSocket) => {
-    console.log(`🔌 User ${socket.userEmail} connected via WebSocket`);
+    console.log(`🔌 User ${socket.userEmail} (ID: ${socket.userId}) connected via WebSocket`);
 
     // Join user to their personal room for user-specific updates
     socket.join(`user:${socket.userId}`);
-    
-    // Join general tickets room for dashboard updates
-    socket.join("tickets:all");
+    console.log(`👤 User ${socket.userEmail} joined room: user:${socket.userId}`);
+
+    // Handle subscription to different ticket views
+    socket.on("tickets:subscribeToAll", async () => {
+      // Only admin/managers should subscribe to all tickets
+      socket.join("tickets:all");
+      console.log(`🎯 User ${socket.userEmail} subscribed to ALL tickets`);
+      
+      // Send initial all tickets data
+      try {
+        const result = await db.query(`
+          SELECT 
+            t.*,
+            d.name as department_name,
+            d.id as department_id,
+            c.name as category_name,
+            c.description as category_description,
+            c.id as category_id,
+            u_creator.name as created_by_name,
+            u_creator.email as created_by_email,
+            u_assignee.name as assignee_name,
+            u_assignee.email as assignee_email,
+            u_assignee.id as assignee_id
+          FROM tickets t
+          LEFT JOIN departments d ON t.department_id = d.id
+          LEFT JOIN categories c ON t.category_id = c.id
+          LEFT JOIN users u_creator ON t.created_by = u_creator.id
+          LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
+          ORDER BY t.created_at DESC
+        `);
+        
+        const transformedData = result.rows.map(row => ({
+          id: row.id,
+          ticket_number: row.ticket_number,
+          title: row.title,
+          description: row.description,
+          status: row.status,
+          priority: row.priority,
+          attachments: row.attachments,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          department: row.department_id ? {
+            id: row.department_id,
+            name: row.department_name
+          } : null,
+          category: row.category_id ? {
+            id: row.category_id,
+            name: row.category_name,
+            description: row.category_description
+          } : null,
+          created_by: {
+            id: row.created_by,
+            name: row.created_by_name,
+            email: row.created_by_email
+          },
+          assignee: row.assignee_id ? {
+            id: row.assignee_id,
+            name: row.assignee_name,
+            email: row.assignee_email
+          } : null
+        }));
+
+        socket.emit("tickets:allList", {
+          success: true,
+          data: transformedData,
+          message: "All tickets loaded",
+          timestamp: new Date().toISOString()
+        });
+        
+        console.log(`📨 Sent ${transformedData.length} tickets to ${socket.userEmail} (ALL)`);
+      } catch (error) {
+        console.error("Error sending all tickets:", error);
+        socket.emit("tickets:error", {
+          success: false,
+          error: "Failed to fetch all tickets"
+        });
+      }
+    });
+
+    // Handle subscription to user's own tickets
+    socket.on("tickets:subscribeToMine", async () => {
+      socket.join(`tickets:user:${socket.userId}`);
+      console.log(`👤 User ${socket.userEmail} subscribed to THEIR tickets`);
+      
+      // Send initial user tickets data
+      try {
+        const result = await db.query(`
+          SELECT 
+            t.*,
+            d.name as department_name,
+            d.id as department_id,
+            c.name as category_name,
+            c.description as category_description,
+            c.id as category_id,
+            u_creator.name as created_by_name,
+            u_creator.email as created_by_email,
+            u_assignee.name as assignee_name,
+            u_assignee.email as assignee_email,
+            u_assignee.id as assignee_id
+          FROM tickets t
+          LEFT JOIN departments d ON t.department_id = d.id
+          LEFT JOIN categories c ON t.category_id = c.id
+          LEFT JOIN users u_creator ON t.created_by = u_creator.id
+          LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
+          WHERE t.created_by = $1 OR t.assignee_id = $1
+          ORDER BY t.created_at DESC
+        `, [socket.userId]);
+        
+        const transformedData = result.rows.map(row => ({
+          id: row.id,
+          ticket_number: row.ticket_number,
+          title: row.title,
+          description: row.description,
+          status: row.status,
+          priority: row.priority,
+          attachments: row.attachments,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          department: row.department_id ? {
+            id: row.department_id,
+            name: row.department_name
+          } : null,
+          category: row.category_id ? {
+            id: row.category_id,
+            name: row.category_name,
+            description: row.category_description
+          } : null,
+          created_by: {
+            id: row.created_by,
+            name: row.created_by_name,
+            email: row.created_by_email
+          },
+          assignee: row.assignee_id ? {
+            id: row.assignee_id,
+            name: row.assignee_name,
+            email: row.assignee_email
+          } : null
+        }));
+
+        socket.emit("tickets:myList", {
+          success: true,
+          data: transformedData,
+          message: "Your tickets loaded",
+          timestamp: new Date().toISOString()
+        });
+        
+        console.log(`📨 Sent ${transformedData.length} tickets to ${socket.userEmail} (MINE)`);
+      } catch (error) {
+        console.error("Error sending user tickets:", error);
+        socket.emit("tickets:error", {
+          success: false,
+          error: "Failed to fetch your tickets"
+        });
+      }
+    });
 
     // Handle getting all tickets (replaces GET /api/v1/tickets)
     socket.on("tickets:getAll", async (callback) => {
