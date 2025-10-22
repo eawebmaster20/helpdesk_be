@@ -1,6 +1,8 @@
 require("dotenv").config();
 
 import express, { Application, Request, Response } from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
 import authRoutes from "./routes/auth.routes";
 import ticketsRoutes from "./routes/tickets.routes";
@@ -10,13 +12,28 @@ import adminRoutes from "./routes/admin.routes";
 import kbRoutes from "./routes/kb.routes";
 import webhooksRoutes from "./routes/webhooks.routes";
 import departmentsRoutes from "./routes/departments.routes";
+import branchesRoutes from "./routes/branches.routes";
 import usersRoutes from "./routes/users.routes";
 import cors from "cors";
 import { db, initializeDatabase } from "./db/index";
 import { sendPasswordSetupEmail, sendTestEmail } from "./utils/email";
-import { Server} from "socket.io";
+import { setupTicketSocketHandlers } from "./websockets/ticket.socket";
 
 const app: Application = express();
+const httpServer = createServer(app);
+
+// Setup Socket.IO with CORS
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*", // Allow all origins for development; restrict in production
+    credentials: true,
+    methods: ["GET", "POST"]
+  }
+});
+
+// Make io available globally
+export { io };
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(
@@ -41,6 +58,7 @@ app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/kb", kbRoutes);
 app.use("/api/v1/webhooks", webhooksRoutes);
 app.use("/api/v1/departments", departmentsRoutes);
+app.use("/api/v1/branches", branchesRoutes);
 app.use("/api/v1/users", usersRoutes);
 app.get("/health", async (req, res) => {
   try {
@@ -139,10 +157,14 @@ const startServer = async () => {
       );
       process.exit(1);
     }
-    app.listen(PORT, () => {
-      console.log("\n Server is running!");
+    // Setup WebSocket handlers
+    setupTicketSocketHandlers(io);
+
+    httpServer.listen(PORT, () => {
+      console.log("\nServer is running!");
       console.log(` Health check: http://localhost:${PORT}/api/health`);
       console.log(` API base URL: http://localhost:${PORT}/api/v1`);
+      console.log(` WebSocket: ws://localhost:${PORT}`);
       console.log(` CORS enabled for: ${process.env.FRONTEND_URL}`);
       console.log(` Environment: ${process.env.NODE_ENV}\n`);
     });
@@ -155,7 +177,7 @@ const startServer = async () => {
     //     // Start server
     //     app.listen(PORT, () => {
     //       console.log("\n Server is running!");
-    //       console.log(` Health check: http://localhost:${PORT}//api/health`);
+    //       console.log(` Health check: http://localhost:${PORT}/api/health`);
     //       console.log(` API base URL: http://localhost:${PORT}/api/v1`);
     //       console.log(` CORS enabled for: ${process.env.FRONTEND_URL}`);
     //       console.log(` Environment: ${process.env.NODE_ENV}\n`);
