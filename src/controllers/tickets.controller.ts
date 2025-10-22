@@ -8,6 +8,8 @@ import {
 } from "../models/ticket.model";
 import { Request, Response } from "express";
 import { db } from "../db";
+import { io } from "../index";
+import { emitTicketUpdate, emitUserTicketUpdate } from "../websockets/ticket.socket";
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
@@ -48,7 +50,17 @@ export async function addTicketComment(req: Request, res: Response) {
     const action = "commented on the ticket";
     await addTicketActivityModel(id, 'comment', authorId, action, body);
     
-    res.status(201).json(result.rows[0]);
+    const newComment = result.rows[0];
+    
+    // Emit real-time event for new comment
+    emitTicketUpdate(io, "ticket:commentAdded", {
+      ticketId: id,
+      comment: newComment,
+      message: "New comment added to ticket",
+      timestamp: new Date().toISOString()
+    });
+    
+    res.status(201).json(newComment);
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
@@ -111,6 +123,23 @@ export async function assignTicket(req: Request, res: Response) {
     const action = `assigned the ticket to ${assigneeName}`;
     await addTicketActivityModel(id, 'assignment', userId, action);
     
+    // Emit real-time event for ticket assignment
+    emitTicketUpdate(io, "ticket:assigned", {
+      ticketId: id,
+      assigneeId: assigneeId,
+      assigneeName: assigneeName,
+      assignedBy: userId,
+      message: `Ticket assigned to ${assigneeName}`,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Notify the assignee specifically
+    emitUserTicketUpdate(io, assigneeId, "ticket:assignedToYou", {
+      ticketId: id,
+      message: "A ticket has been assigned to you",
+      timestamp: new Date().toISOString()
+    });
+    
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
@@ -158,6 +187,16 @@ export async function transitionTicket(req: Request, res: Response) {
     // Add activity tracking
     const action = `changed status to ${to}`;
     await addTicketActivityModel(id, 'status', userId, action, reason);
+    
+    // Emit real-time event for ticket status change
+    emitTicketUpdate(io, "ticket:statusChanged", {
+      ticketId: id,
+      newStatus: to,
+      reason: reason,
+      changedBy: userId,
+      message: `Ticket status changed to ${to}`,
+      timestamp: new Date().toISOString()
+    });
     
     res.json({ message: "Transitioned", transition: transitionResult.rows[0] });
   } catch (err) {
@@ -367,7 +406,23 @@ export async function createTicket(req: Request, res: Response) {
     const action = "created the ticket";
     await addTicketActivityModel(ticketId, 'status', createdBy, action);
     
-    res.status(201).json(result.rows[0]);
+    const newTicket = result.rows[0];
+    
+    // Emit real-time event for new ticket creation
+    emitTicketUpdate(io, "ticket:created", {
+      ticket: newTicket,
+      message: "New ticket created",
+      timestamp: new Date().toISOString()
+    });
+    
+    // Emit to the ticket creator specifically
+    emitUserTicketUpdate(io, createdBy, "ticket:created", {
+      ticket: newTicket,
+      message: "Your ticket has been created successfully",
+      timestamp: new Date().toISOString()
+    });
+    
+    res.status(201).json(newTicket);
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
