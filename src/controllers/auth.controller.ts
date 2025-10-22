@@ -11,13 +11,14 @@ import { Client, Attribute, Change } from "ldapts";
 import { db } from "../db";
 import { parseLDAPDN } from "../utils/ldap";
 import { generateUserToken } from "../middlewares/jwt.utils";
+import { error } from "console";
 
 export async function login(req: Request, res: Response) {
   try {
     const ldapUser: any = await ldapAuthenticate(req, res);
     
     if (!ldapUser || !ldapUser.dn) {
-      return res.status(401).json({ message: "LDAP authentication failed", status: 'error' });
+      return res.status(401).json({ message: "LDAP authentication failed", status: 'error', error: ldapUser});
     }
     
     // Parse LDAP DN to get user information
@@ -34,6 +35,7 @@ export async function login(req: Request, res: Response) {
     if (existingUserResult.rows.length === 0) {
       // User doesn't exist, create new user
       let departmentId = null;
+      let branchId = null;
       
       // Find department ID by matching department name (case-insensitive)
       if (payload.department) {
@@ -46,12 +48,24 @@ export async function login(req: Request, res: Response) {
           departmentId = departmentResult.rows[0].id;
         }
       }
+
+      // Find branch ID by matching branch name (case-insensitive)
+      if (payload.branch) {
+        const branchResult = await db.query(
+          "SELECT id FROM branches WHERE LOWER(name) = LOWER($1)",
+          [payload.branch]
+        );
+
+        if (branchResult.rows.length > 0) {
+          branchId = branchResult.rows[0].id;
+        }
+      }
       
       // Create new user
       const newUserResult = await db.query(
-        `INSERT INTO users (name, email, role, department_id) 
-         VALUES ($1, $2, $3, $4) RETURNING *`,
-        [payload.name, userEmail, '0', departmentId]
+        `INSERT INTO users (name, email, role, department_id, branch_id) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [payload.name, userEmail, '0', departmentId, branchId]
       );
       
       dbUser = newUserResult.rows[0];
@@ -71,9 +85,13 @@ export async function login(req: Request, res: Response) {
         u.updated_at,
         d.id as department_id,
         d.name as department_name,
-        d.head_id as department_head_id
+        d.head_id as department_head_id,
+        b.id as branch_id,
+        b.name as branch_name,
+        b.head_id as branch_head_id
       FROM users u
       LEFT JOIN departments d ON u.department_id = d.id
+      LEFT JOIN branches b ON u.branch_id = b.id
       WHERE u.id = $1
     `, [dbUser.id]);
     
@@ -91,7 +109,13 @@ export async function login(req: Request, res: Response) {
         id: userWithDept.department_id,
         name: userWithDept.department_name,
         head_id: userWithDept.department_head_id
-      } : null
+      } : null,
+      branch: userWithDept.branch_id ? {
+        id: userWithDept.branch_id,
+        name: userWithDept.branch_name,
+        head_id: userWithDept.branch_head_id
+      } : null,
+      ldapUser
     };
     
     // Generate JWT token
