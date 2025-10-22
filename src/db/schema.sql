@@ -5,12 +5,22 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(100) NOT NULL UNIQUE,
   role VARCHAR(32),
   department_id UUID,
+  branch_id UUID,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Departments table
 CREATE TABLE IF NOT EXISTS departments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(100) NOT NULL,
+  head_id UUID,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Branches table
+CREATE TABLE IF NOT EXISTS branches (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
   head_id UUID,
