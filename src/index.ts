@@ -25,9 +25,12 @@ const httpServer = createServer(app);
 // Setup Socket.IO with CORS
 const io = new Server(httpServer, {
   cors: {
-    origin: "*", // Allow all origins for development; restrict in production
+    origin: process.env.NODE_ENV === "production" 
+      ? [process.env.FRONTEND_URL || "https://yourdomain.com"] 
+      : "*", // Allow all origins for development; restrict in production
     credentials: true,
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Authorization", "Content-Type"]
   }
 });
 
