@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   ticket_number VARCHAR(20) UNIQUE NOT NULL,
   title VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
-  department_id UUID,
+  department_id VARCHAR(255),
   created_by UUID,
   category_id UUID,
   status VARCHAR(32) NOT NULL,
