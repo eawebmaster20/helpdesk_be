@@ -8,6 +8,10 @@ export async function getUserByEmail(email: string) {
   return db.query("SELECT * FROM users WHERE email = $1", [email]);
 }
 
+export async function getUserGroupModel(role: string) {
+  return db.query("SELECT * FROM users WHERE role = $1 ORDER BY created_at DESC", [role]);
+}
+
 export async function insertUserModel(
   name: string,
   email: string,
