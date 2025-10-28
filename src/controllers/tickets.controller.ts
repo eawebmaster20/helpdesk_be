@@ -94,7 +94,8 @@ export async function addTicketAttachment(req: Request, res: Response) {
 
 export async function assignTicket(req: Request, res: Response) {
   const { id } = req.params;
-  const { assigneeId, auto, userId } = req.body;
+  const auto = process.env.AUTO_ASSIGN_TICKETS;
+  const { assigneeId, userId } = req.body;
   if (auto) {
     return res.status(501).json({ message: "Auto-assign not implemented" });
   }
@@ -367,10 +368,10 @@ export async function getTicketsByUser(req: Request, res: Response) {
 
 export async function createTicket(req: Request, res: Response) {
   const { title, description, departmentId, createdBy, priority, categoryId, attachments } = req.body;
-  if (!title || !createdBy || !priority || !categoryId ) {
+  if (!title || !title.trim() || !createdBy || !createdBy.trim() || !priority || !priority.trim() || !categoryId || !categoryId.trim()) {
     return res.status(400).json({
       message:
-        "title, createdBy, priority, category are required",
+        "title, departmentId, createdBy, priority, category are required and cannot be empty",
         value:req.body
     });
   }
@@ -390,6 +391,7 @@ export async function createTicket(req: Request, res: Response) {
       `UPDATE ticket_counter SET current_number = current_number + 1, updated_at = NOW() 
        WHERE id = 1 RETURNING current_number`
     );
+
     
     const ticketNumber = `TKT-${counterResult.rows[0].current_number}`;
     
@@ -397,15 +399,25 @@ export async function createTicket(req: Request, res: Response) {
     const result = await db.query(
       `INSERT INTO tickets (ticket_number, title, description, department_id, created_by, status, priority, category_id, attachments) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [ticketNumber, title, description, departmentId, createdBy, "New", priority, categoryId, attachments || []]
+      [
+        ticketNumber, 
+        title, 
+        description, 
+        departmentId && departmentId.trim() !== '' ? departmentId : null, 
+        createdBy, 
+        "New", 
+        priority, 
+        categoryId && categoryId.trim() !== '' ? categoryId : null, 
+        attachments || []
+      ]
     );
+
     
     const ticketId = result.rows[0].id;
     
     // Add initial activity tracking for ticket creation
     const action = "created the ticket";
     await addTicketActivityModel(ticketId, 'status', createdBy, action);
-    
     const newTicket = result.rows[0];
     
     // Emit real-time event for new ticket creation
@@ -414,7 +426,8 @@ export async function createTicket(req: Request, res: Response) {
       message: "New ticket created",
       timestamp: new Date().toISOString()
     });
-    
+
+
     // Emit to the ticket creator specifically
     emitUserTicketUpdate(io, createdBy, "ticket:created", {
       ticket: newTicket,
@@ -530,5 +543,3 @@ export async function getTicketActivities(req: Request, res: Response) {
     res.status(500).json({ message: "Database error", error: err });
   }
 }
-
-// ...add more ticket-related controller functions as needed...
