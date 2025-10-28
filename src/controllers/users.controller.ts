@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import {
+  getUserGroupModel,
   getUsersModel,
   insertUserModel,
   updateUserModel,
@@ -9,6 +10,20 @@ export async function getUsers(req: Request, res: Response) {
   try {
     const result = await getUsersModel();
     res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: "Database error", error: err });
+  }
+}
+
+export async function getL2Users(req: Request, res: Response) {
+  const { id } = req.params;
+  try {
+    const result = await getUserGroupModel(id);
+    res.json({
+      data: result.rows,
+      message: 'Users retrieved successfully',
+      status: 'success'
+    });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
