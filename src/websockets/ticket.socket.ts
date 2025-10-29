@@ -38,14 +38,14 @@ export function setupTicketSocketHandlers(io: Server) {
     console.log(`🔌 User ${socket.userEmail} (ID: ${socket.userId}) connected via WebSocket`);
 
     // Join user to their personal room for user-specific updates
-    socket.join(`user:${socket.userId}`);
-    console.log(`👤 User ${socket.userEmail} joined room: user:${socket.userId}`);
+    // socket.join(`user:${socket.userId}`);
+    // console.log(`👤 User ${socket.userEmail} joined room: user:${socket.userId}`);
 
     // Handle subscription to different ticket views
-    socket.on("tickets:subscribeToAll", async () => {
+    socket.on("tickets:subscribeToAll", async (callback) => {
       // Only admin/managers should subscribe to all tickets
       socket.join("tickets:all");
-      console.log(`🎯 User ${socket.userEmail} subscribed to ALL tickets`);
+      console.log(`User ${socket.userEmail} subscribed to ALL tickets`);
       
       // Send initial all tickets data
       try {
@@ -101,11 +101,10 @@ export function setupTicketSocketHandlers(io: Server) {
           } : null
         }));
 
-        socket.emit("tickets:allList", {
+        callback({
           success: true,
           data: transformedData,
-          message: "All tickets loaded",
-          timestamp: new Date().toISOString()
+          message: "Tickets retrieved successfully"
         });
         
         console.log(`📨 Sent ${transformedData.length} tickets to ${socket.userEmail} (ALL)`);
