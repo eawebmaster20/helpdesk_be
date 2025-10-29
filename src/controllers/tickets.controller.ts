@@ -96,7 +96,7 @@ export async function assignTicket(req: Request, res: Response) {
   const { id } = req.params;
   const auto = process.env.AUTO_ASSIGN_TICKETS;
   const { assigneeId, userId } = req.body;
-  if (auto) {
+  if (auto === 'true') {
     return res.status(501).json({ message: "Auto-assign not implemented" });
   }
   if (!assigneeId) {
