@@ -9,7 +9,7 @@ import {
 import { Request, Response } from "express";
 import { db } from "../db";
 import { io } from "../index";
-import { emitTicketUpdate, emitUserTicketUpdate } from "../websockets/ticket.socket";
+import { emitTicketCreatedEvent, emitTicketUpdate, emitTicketUpdateToL2User, emitUserTicketAssign } from "../websockets/ticket.socket";
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
@@ -26,7 +26,15 @@ export async function updateTicket(req: Request, res: Response) {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Ticket not found" });
     }
-    res.json(result.rows[0]);
+    res.json('ok');
+    emitTicketUpdateToL2User(io, "tickets:myList", {
+        title,
+        description,
+        status,
+        priority,
+        assigneeId
+      }
+    );
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
@@ -53,7 +61,7 @@ export async function addTicketComment(req: Request, res: Response) {
     const newComment = result.rows[0];
     
     // Emit real-time event for new comment
-    emitTicketUpdate(io, "ticket:commentAdded", {
+    emitTicketUpdate(io, authorId, ["ticket:commentAdded"], {
       ticketId: id,
       comment: newComment,
       message: "New comment added to ticket",
@@ -113,35 +121,74 @@ export async function assignTicket(req: Request, res: Response) {
       "SELECT name FROM users WHERE id = $1",
       [assigneeId]
     );
+    const createdByResult = await db.query(
+      "SELECT created_by FROM tickets WHERE id = $1",
+      [id]
+    );
+    const createdBy = createdByResult.rows[0]?.created_by;
+    const ticketResult = await db.query(`
+      SELECT 
+        t.*,
+        d.name as department_name,
+        d.id as department_id,
+        c.name as category_name,
+        c.description as category_description,
+        c.id as category_id,
+        u_creator.name as created_by_name,
+        u_creator.email as created_by_email,
+        u_assignee.name as assignee_name,
+        u_assignee.email as assignee_email,
+        u_assignee.id as assignee_id
+      FROM tickets t
+      LEFT JOIN departments d ON t.department_id = d.id
+      LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN users u_creator ON t.created_by = u_creator.id
+      LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
+      WHERE t.id = $1
+    `, [id]);
+    const ticket = ticketResult.rows[0];
     
     const result = await assignTicketModel(id, assigneeId);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Ticket not found" });
     }
+     
     
     // Add activity tracking
-    const assigneeName = assigneeResult.rows[0]?.name || 'Unknown User';
-    const action = `assigned the ticket to ${assigneeName}`;
+    const assignee = assigneeResult.rows[0] || 'Unknown User';
+    const action = `assigned the ticket to ${assignee.name}`;
     await addTicketActivityModel(id, 'assignment', userId, action);
     
     // Emit real-time event for ticket assignment
-    emitTicketUpdate(io, "ticket:assigned", {
-      ticketId: id,
-      assigneeId: assigneeId,
-      assigneeName: assigneeName,
-      assignedBy: userId,
-      message: `Ticket assigned to ${assigneeName}`,
-      timestamp: new Date().toISOString()
-    });
+    const usersInvolved = [
+      `user:${assigneeId}:ticket:update`, 
+      `user:${userId}:ticket:update`,
+      `user:${createdBy}:ticket:update`,
+      'all:ticket:updates'
+    ];
+    emitTicketUpdate(io, userId, usersInvolved, 
+      {
+        status: 'assigned',
+        data: {
+          ticketId: id,
+          assigneeId: assigneeId,
+          assignee: assignee,
+          assignedBy: userId,
+          message: `Ticket assigned to ${assignee.name}`,
+          timestamp: new Date().toISOString()
+        },
+        message: `Ticket assigned to ${assignee.name}`
+      }
+    );
     
     // Notify the assignee specifically
-    emitUserTicketUpdate(io, assigneeId, "ticket:assignedToYou", {
-      ticketId: id,
+    emitUserTicketAssign(io, assigneeId, `tickets:assignment:${assigneeId}`, {
+      data: ticket,
       message: "A ticket has been assigned to you",
       timestamp: new Date().toISOString()
     });
     
-    res.json(result.rows[0]);
+    res.json({ message: "Assigned", data:[] });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
@@ -190,7 +237,7 @@ export async function transitionTicket(req: Request, res: Response) {
     await addTicketActivityModel(id, 'status', userId, action, reason);
     
     // Emit real-time event for ticket status change
-    emitTicketUpdate(io, "ticket:statusChanged", {
+    emitTicketUpdate(io, userId, ["ticket:statusChanged"], {
       ticketId: id,
       newStatus: to,
       reason: reason,
@@ -421,17 +468,9 @@ export async function createTicket(req: Request, res: Response) {
     const newTicket = result.rows[0];
     
     // Emit real-time event for new ticket creation
-    emitTicketUpdate(io, "ticket:created", {
+    emitTicketCreatedEvent(io, createdBy, "ticket:created", {
       ticket: newTicket,
       message: "New ticket created",
-      timestamp: new Date().toISOString()
-    });
-
-
-    // Emit to the ticket creator specifically
-    emitUserTicketUpdate(io, createdBy, "ticket:created", {
-      ticket: newTicket,
-      message: "Your ticket has been created successfully",
       timestamp: new Date().toISOString()
     });
     
