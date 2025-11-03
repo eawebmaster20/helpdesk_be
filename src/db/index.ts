@@ -36,3 +36,25 @@ export async function initializeDatabase(): Promise<void> {
     throw err;
   }
 }
+
+export async function resetDatabase(): Promise<void> {
+  try {
+    // PostgreSQL way to drop tables with foreign key constraints
+    // Use CASCADE to automatically drop dependent objects
+    await db.query("DROP TABLE IF EXISTS ticket_activities CASCADE");
+    await db.query("DROP TABLE IF EXISTS kb_articles CASCADE");
+    await db.query("DROP TABLE IF EXISTS automations CASCADE");
+    await db.query("DROP TABLE IF EXISTS sla_policies CASCADE");
+    await db.query("DROP TABLE IF EXISTS forms CASCADE");
+    await db.query("DROP TABLE IF EXISTS ticket_approvals CASCADE");
+    await db.query("DROP TABLE IF EXISTS tickets CASCADE");
+    await db.query("DROP TABLE IF EXISTS categories CASCADE");
+    await db.query("DROP TABLE IF EXISTS ticket_counter CASCADE");
+    await db.query("DROP TABLE IF EXISTS branches CASCADE");
+    await db.query("DROP TABLE IF EXISTS departments CASCADE");
+    await db.query("DROP TABLE IF EXISTS users CASCADE");
+    console.log("Database reset successfully.");
+  } catch (error) {
+    console.error("Failed to reset database:", error);
+  }
+}
