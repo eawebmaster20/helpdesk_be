@@ -11,10 +11,10 @@ interface AuthenticatedSocket extends Socket {
   userEmail?: string;
 }
 
-// WebSocket event handlers for tickets
+
 export function setupTicketSocketHandlers(io: Server) {
   
-  // Authentication middleware for WebSocket connections
+  
   io.use(async (socket: AuthenticatedSocket, next) => {
     try {
       const token = socket.handshake.auth.token;
@@ -35,11 +35,52 @@ export function setupTicketSocketHandlers(io: Server) {
   });
 
   io.on("connection", (socket: AuthenticatedSocket) => {
-    console.log(`🔌 User ${socket.userEmail} (ID: ${socket.userId}) connected via WebSocket`);
 
-    // Join user to their personal room for user-specific updates
-    // socket.join(`user:${socket.userId}`);
-    // console.log(`👤 User ${socket.userEmail} joined room: user:${socket.userId}`);
+    // Handle subscription to ticket created events
+    socket.on("tickets:subscribeToTicketCreated", async (callback) => {
+      // Only admin/managers should subscribe to all tickets
+      socket.join("tickets:created");
+      console.log(`User ${socket.userEmail} subscribed to CREATED tickets`);
+      callback({
+          success: true,
+          data: [],
+          message: "Tickets retrieved successfully"
+        });  
+    });
+
+    socket.on("tickets:subscribeTo:assignment", async (callback) => {
+      console.log(`User id is ${socket.userId} and email is ${socket.userEmail}`);
+
+      // Join a user-specific room for assignments
+      socket.join(`tickets:assignment:${socket.userId}`);
+      callback({
+        success: true,
+        data: [],
+        message: "Subscribed to ticket assignments successfully"
+      })
+    });
+
+
+    socket.on("tickets:subscribeToMyTicketUpdates", async (callback) => {
+      // Only admin/managers should subscribe to all tickets
+      socket.join(`ticket:update`);
+      console.log(`User ${socket.userEmail} subscribed to their ticket updates`);
+      io.to(`ticket:update`).emit(`user:${socket.userId}:ticket:update`, {
+          success: true,
+          data: [],
+          message: "Your ticket updates have been retrieved successfully"
+      });
+    });
+
+    socket.on("tickets:subscribeToAllTicketsUpdates", async (callback) => {
+      socket.join(`ticket:update`);
+      console.log(`User ${socket.userEmail} subscribed to all ticket updates`);
+      io.to(`ticket:update`).emit(`all:ticket:updates`, {
+          success: true,
+          data: [],
+          message: "Your ticket updates have been retrieved successfully"
+      });
+    });
 
     // Handle subscription to different ticket views
     socket.on("tickets:subscribeToAll", async (callback) => {
@@ -117,10 +158,11 @@ export function setupTicketSocketHandlers(io: Server) {
       }
     });
 
+
     // Handle subscription to user's own tickets
     socket.on("tickets:subscribeToMine", async () => {
       socket.join(`tickets:user:${socket.userId}`);
-      console.log(`👤 User ${socket.userEmail} subscribed to THEIR tickets`);
+      console.log(`👤 User ${socket.userId} subscribed to THEIR tickets`);
       
       // Send initial user tickets data
       try {
@@ -177,7 +219,7 @@ export function setupTicketSocketHandlers(io: Server) {
           } : null
         }));
 
-        socket.emit("tickets:myList", {
+        socket.emit(`tickets:user:${socket.userId}`, {
           success: true,
           data: transformedData,
           message: "Your tickets loaded",
@@ -194,7 +236,6 @@ export function setupTicketSocketHandlers(io: Server) {
       }
     });
 
-    // Handle getting all tickets (replaces GET /api/v1/tickets)
     socket.on("tickets:getAll", async (callback) => {
       try {
         const result = await db.query(`
@@ -460,12 +501,51 @@ export function setupTicketSocketHandlers(io: Server) {
   });
 }
 
-// Helper function to emit real-time updates to all connected clients
-export function emitTicketUpdate(io: Server, event: string, data: any) {
-  io.to("tickets:all").emit(event, data);
+export function emitTicketUpdateToL2User(io: Server, event: string, data: any) {
+  console.log("Emitting to L2 user room:", event);
+  io.to(`tickets:myList`).emit("tickets:myList", {
+    success: true,
+    data: data,
+    message: "Your tickets loaded",
+    timestamp: new Date().toISOString()
+  });
 }
 
-// Helper function to emit updates to specific user
-export function emitUserTicketUpdate(io: Server, userId: string, event: string, data: any) {
-  io.to(`user:${userId}`).emit(event, data);
+
+export function emitTicketUpdate(io: Server, userId: string, eventList: string[], data: any) {
+  for (const event of eventList) {
+    console.log("Emitting to ticket update room ticket:updated and topic: ", event);
+    io.to(`ticket:update`).emit(event, data);
+  }
+}
+
+
+export function emitTicketCreatedEvent(io: Server, userId: string, event: string, data: any) {
+  console.log("Emitting to created tickets room:", event);
+  io.to(['tickets:created', `tickets:user:${userId}`]).emit(event, data);
+}
+
+export function emitUserTicketAssign(io: Server, userId: string, event: string, data: any) { 
+  io.to(`tickets:assignment:${userId}`).emit(`tickets:assignment:${userId}`, data);
+  // io.sockets.adapter.rooms.forEach((value, key) => {
+  //   console.log("confirming Room key:", key);
+  // });
+  // console.log(`User ${userId} is connected and in assignment room. Emitting...`);
+
+  // Get all sockets in the user's assignment room
+  // const room = io.sockets.adapter.rooms.get(`tickets:assignment:${userId}`);
+  
+  // if (room && room.size > 0) {
+  // } else {
+  //   console.log(`User ${userId} is not connected or not in assignment room. Saving for later or using fallback...`);
+  //   // Option 1: Emit to a general room that admins/managers might be in
+  //   io.to("tickets:newAssignment").emit(`tickets:assignedTo:${userId}`, {
+  //     ...data,
+  //     targetUserId: userId,
+  //     note: "User was offline when assigned"
+  //   });
+    
+    // Option 2: Store in database/cache for when user reconnects
+    // await storeNotificationForUser(userId, data);
+  // }
 }
