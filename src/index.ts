@@ -15,7 +15,7 @@ import departmentsRoutes from "./routes/departments.routes";
 import branchesRoutes from "./routes/branches.routes";
 import usersRoutes from "./routes/users.routes";
 import cors from "cors";
-import { db, initializeDatabase } from "./db/index";
+import { db, initializeDatabase, resetDatabase } from "./db/index";
 import { sendPasswordSetupEmail, sendTestEmail } from "./utils/email";
 import { setupTicketSocketHandlers } from "./websockets/ticket.socket";
 
@@ -63,6 +63,22 @@ app.use("/api/v1/webhooks", webhooksRoutes);
 app.use("/api/v1/departments", departmentsRoutes);
 app.use("/api/v1/branches", branchesRoutes);
 app.use("/api/v1/users", usersRoutes);
+app.get("/init-db", async (req: Request, res: Response) => {
+  try {
+    await initializeDatabase();
+    res.send("Database initialized successfully");
+  } catch (error) {
+    res.status(500).send("Failed to initialize database");
+  }
+});
+app.get("/reset-db", async (req: Request, res: Response) => {
+  try {
+    await resetDatabase();
+    res.send("Database reset successfully");
+  } catch (error) {
+    res.status(500).send("Failed to reset database");
+  }
+});
 app.get("/health", async (req, res) => {
   try {
     // Check database connection
