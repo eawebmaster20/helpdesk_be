@@ -13,7 +13,10 @@ import { emitTicketCreatedEvent, emitTicketUpdate, emitTicketUpdateToL2User, emi
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
-  const { title, description, status, priority, assigneeId } = req.body;
+  const { title, userId, description, status, priority, assigneeId } = req.body;
+  const ticketResult = await db.query(`
+    SELECT * FROM tickets WHERE id = $1
+  `, [id]);
   try {
     const result = await updateTicketModel(
       id,
@@ -26,15 +29,81 @@ export async function updateTicket(req: Request, res: Response) {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Ticket not found" });
     }
+    let action = ""
+    // Determine what was updated for activity tracking
+    if (title !== ticketResult.rows[0].title) {
+      action += `changed title from "${ticketResult.rows[0].title}" to "${title}". `;
+    }
+    if (description !== ticketResult.rows[0].description) {
+      action += `changed description from "${ticketResult.rows[0].description}" to "${description}". `;
+    }
+    if (status !== ticketResult.rows[0].status) {
+      action += `changed status from "${ticketResult.rows[0].status}" to "${status}". `;
+    }
+    if (priority !== ticketResult.rows[0].priority) {
+      action += `changed priority from "${ticketResult.rows[0].priority}" to "${priority}". `;
+    }
+    if (assigneeId !== ticketResult.rows[0].assignee_id) {
+      action += `Reassigned assignee from "${ticketResult.rows[0].assignee_id}" to "${assigneeId}". `;
+    }
+    await addTicketActivityModel(id, 'status', userId, action);
+    const updatedTicket = await db.query(`
+      SELECT 
+        t.*,
+        d.name as department_name,
+        d.id as department_id,
+        c.name as category_name,
+        c.description as category_description,
+        c.id as category_id,
+        u_creator.name as created_by_name,
+        u_creator.email as created_by_email,
+        u_assignee.name as assignee_name,
+        u_assignee.email as assignee_email,
+        u_assignee.id as assignee_id
+      FROM tickets t
+      LEFT JOIN departments d ON t.department_id = d.id
+      LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN users u_creator ON t.created_by = u_creator.id
+      LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
+      WHERE t.id = $1
+    `, [id]);
+    const transformedData = updatedTicket.rows.map(row => ({
+          id: row.id,
+          ticket_number: row.ticket_number,
+          title: row.title,
+          description: row.description,
+          status: row.status,
+          priority: row.priority,
+          attachments: row.attachments,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          department: row.department_id ? {
+            id: row.department_id,
+            name: row.department_name
+          } : null,
+          category: row.category_id ? {
+            id: row.category_id,
+            name: row.category_name,
+            description: row.category_description
+          } : null,
+          created_by: {
+            id: row.created_by,
+            name: row.created_by_name,
+            email: row.created_by_email
+          },
+          assignee: row.assignee_id ? {
+            id: row.assignee_id,
+            name: row.assignee_name,
+            email: row.assignee_email
+          } : null
+        }));
+    
     res.json('ok');
-    emitTicketUpdateToL2User(io, "tickets:myList", {
-        title,
-        description,
-        status,
-        priority,
-        assigneeId
-      }
-    );
+    emitTicketUpdate(io, assigneeId, ["ticket:statusChanged"], {
+      data: transformedData[0],
+      message: "A ticket has been updated",
+      success: true
+    });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
