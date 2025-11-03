@@ -43,9 +43,17 @@ export async function login(req: Request, res: Response) {
           "SELECT id FROM departments WHERE LOWER(name) = LOWER($1)",
           [payload.department]
         );
-        
+        // meaning department exists
         if (departmentResult.rows.length > 0) {
           departmentId = departmentResult.rows[0].id;
+        }
+        else {
+          // create new department
+          const newDeptResult =  await db.query(
+            `INSERT INTO departments (name) VALUES ($1) RETURNING *`,
+            [payload.department]
+          );
+          departmentId = newDeptResult.rows[0].id;
         }
       }
 
@@ -55,9 +63,16 @@ export async function login(req: Request, res: Response) {
           "SELECT id FROM branches WHERE LOWER(name) = LOWER($1)",
           [payload.branch]
         );
-
+        // meaning branch exists
         if (branchResult.rows.length > 0) {
           branchId = branchResult.rows[0].id;
+        } else {
+          // create new branch
+          const newBranchResult = await db.query(
+            `INSERT INTO branches (name) VALUES ($1) RETURNING *`,
+            [payload.branch]
+          );
+          branchId = newBranchResult.rows[0].id;
         }
       }
       
