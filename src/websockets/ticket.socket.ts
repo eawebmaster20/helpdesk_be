@@ -161,8 +161,7 @@ export function setupTicketSocketHandlers(io: Server) {
 
     // Handle subscription to user's own tickets
     socket.on("tickets:subscribeToMine", async () => {
-      socket.join(`tickets:user:${socket.userId}`);
-      console.log(`👤 User ${socket.userId} subscribed to THEIR tickets`);
+      socket.join(socket.userId!);
       
       // Send initial user tickets data
       try {
@@ -219,14 +218,13 @@ export function setupTicketSocketHandlers(io: Server) {
           } : null
         }));
 
-        socket.emit(`tickets:user:${socket.userId}`, {
+        socket.emit(socket.userId!, {
           success: true,
           data: transformedData,
           message: "Your tickets loaded",
           timestamp: new Date().toISOString()
         });
         
-        console.log(`📨 Sent ${transformedData.length} tickets to ${socket.userEmail} (MINE)`);
       } catch (error) {
         console.error("Error sending user tickets:", error);
         socket.emit("tickets:error", {
@@ -238,6 +236,7 @@ export function setupTicketSocketHandlers(io: Server) {
 
     socket.on("tickets:getAll", async (callback) => {
       try {
+        console.log('----------here ---------------')
         const result = await db.query(`
           SELECT 
             t.*,
@@ -503,7 +502,7 @@ export function setupTicketSocketHandlers(io: Server) {
 
 export function emitTicketUpdateToL2User(io: Server, event: string, data: any) {
   console.log("Emitting to L2 user room:", event);
-  io.to(`tickets:myList`).emit("tickets:myList", {
+  io.to(`tickets:myList`).emit(event, {
     success: true,
     data: data,
     message: "Your tickets loaded",
@@ -527,25 +526,4 @@ export function emitTicketCreatedEvent(io: Server, userId: string, event: string
 
 export function emitUserTicketAssign(io: Server, userId: string, event: string, data: any) { 
   io.to(`tickets:assignment:${userId}`).emit(`tickets:assignment:${userId}`, data);
-  // io.sockets.adapter.rooms.forEach((value, key) => {
-  //   console.log("confirming Room key:", key);
-  // });
-  // console.log(`User ${userId} is connected and in assignment room. Emitting...`);
-
-  // Get all sockets in the user's assignment room
-  // const room = io.sockets.adapter.rooms.get(`tickets:assignment:${userId}`);
-  
-  // if (room && room.size > 0) {
-  // } else {
-  //   console.log(`User ${userId} is not connected or not in assignment room. Saving for later or using fallback...`);
-  //   // Option 1: Emit to a general room that admins/managers might be in
-  //   io.to("tickets:newAssignment").emit(`tickets:assignedTo:${userId}`, {
-  //     ...data,
-  //     targetUserId: userId,
-  //     note: "User was offline when assigned"
-  //   });
-    
-    // Option 2: Store in database/cache for when user reconnects
-    // await storeNotificationForUser(userId, data);
-  // }
 }
