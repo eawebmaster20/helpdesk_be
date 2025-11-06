@@ -1,11 +1,14 @@
 import { Router } from "express";
-import { createTicketCategory, deleteTicketCategory, getTicketCategories, updateTicketCategory } from "../controllers/ticket-category.controller";
+import { createBulkTicketCategories, createTicketCategory, deleteTicketCategory, getTicketCategories, updateTicketCategory } from "../controllers/ticket-category.controller";
 
 const router = Router();
 
 
 // POST /tickets/category
 router.post("/", createTicketCategory);
+
+// POST /tickets/category/bulk
+router.post("/bulk", createBulkTicketCategories);
 
 // GET /tickets/category
 router.get("/", getTicketCategories);
