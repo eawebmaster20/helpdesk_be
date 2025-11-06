@@ -18,6 +18,29 @@ export async function createTicketCategory(req: Request, res: Response) {
   }
 }
 
+export async function createBulkTicketCategories(req: Request, res: Response) {
+  const categories = req.body.categories;
+  if (!Array.isArray(categories) || categories.length === 0) {
+    return res.status(400).json({ message: "categories array is required" });
+  }
+  try {
+    await db.query("BEGIN");
+    const insertPromises = categories.map((category: any) => {
+      const { name, description } = category;
+      return db.query(
+        `INSERT INTO categories (name, description) VALUES ($1, $2) RETURNING *`,
+        [name, description]
+      );
+    });
+    const results = await Promise.all(insertPromises);
+    await db.query("COMMIT");
+    res.status(201).json(results.map((r) => r.rows[0]));
+  } catch (err) {
+    await db.query("ROLLBACK");
+    res.status(500).json({ message: "Database error", error: err });
+  }
+}
+
 export async function getTicketCategories(req: Request, res: Response) {
   try {
     const result = await db.query("SELECT * FROM categories");
