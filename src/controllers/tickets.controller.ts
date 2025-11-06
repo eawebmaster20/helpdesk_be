@@ -5,18 +5,17 @@ import {
   assignTicketModel,
   addTicketActivityModel,
   getTicketActivitiesModel,
+  getFormatedTicketsIdModel,
 } from "../models/ticket.model";
 import { Request, Response } from "express";
 import { db } from "../db";
 import { io } from "../index";
-import { emitTicketCreatedEvent, emitTicketUpdate, emitTicketUpdateToL2User, emitUserTicketAssign } from "../websockets/ticket.socket";
+import { emitTicketActivityUpdate, emitTicketCreatedEvent, emitTicketUpdate, emitUserTicketAssign } from "../websockets/ticket.socket";
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
   const { title, userId, description, status, priority, assigneeId } = req.body;
-  const ticketResult = await db.query(`
-    SELECT * FROM tickets WHERE id = $1
-  `, [id]);
+  const ticketResult = await getFormatedTicketsIdModel(id);
   try {
     const result = await updateTicketModel(
       id,
@@ -29,78 +28,35 @@ export async function updateTicket(req: Request, res: Response) {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Ticket not found" });
     }
+    
+    const updatedTicket = await getFormatedTicketsIdModel(id);
     let action = ""
     // Determine what was updated for activity tracking
-    if (title !== ticketResult.rows[0].title) {
-      action += `changed title from "${ticketResult.rows[0].title}" to "${title}". `;
+    if (title !== updatedTicket.title) {
+      action += `changed title from "${title}" to "${updatedTicket.title}". `;
     }
-    if (description !== ticketResult.rows[0].description) {
-      action += `changed description from "${ticketResult.rows[0].description}" to "${description}". `;
+    if (description !== updatedTicket.description) {
+      action += `changed description from "${description}" to "${updatedTicket.description}". `;
     }
-    if (status !== ticketResult.rows[0].status) {
-      action += `changed status from "${ticketResult.rows[0].status}" to "${status}". `;
+    if (status !== updatedTicket.status) {
+      action += `changed status from "${status}" to "${updatedTicket.status}". `;
     }
-    if (priority !== ticketResult.rows[0].priority) {
-      action += `changed priority from "${ticketResult.rows[0].priority}" to "${priority}". `;
+    if (priority !== updatedTicket.priority) {
+      action += `changed priority from "${priority}" to "${updatedTicket.priority}". `;
     }
-    if (assigneeId !== ticketResult.rows[0].assignee_id) {
-      action += `Reassigned assignee from "${ticketResult.rows[0].assignee_id}" to "${assigneeId}". `;
-    }
+    // if (assigneeId !== ticketResult.assignee?.id) {
+    //   action += `Reassigned assignee from "${ticketResult.assignee?.name}" to "${assigneeId}". `;
+    // }
     await addTicketActivityModel(id, 'status', userId, action);
-    const updatedTicket = await db.query(`
-      SELECT 
-        t.*,
-        d.name as department_name,
-        d.id as department_id,
-        c.name as category_name,
-        c.description as category_description,
-        c.id as category_id,
-        u_creator.name as created_by_name,
-        u_creator.email as created_by_email,
-        u_assignee.name as assignee_name,
-        u_assignee.email as assignee_email,
-        u_assignee.id as assignee_id
-      FROM tickets t
-      LEFT JOIN departments d ON t.department_id = d.id
-      LEFT JOIN categories c ON t.category_id = c.id
-      LEFT JOIN users u_creator ON t.created_by = u_creator.id
-      LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
-      WHERE t.id = $1
-    `, [id]);
-    const transformedData = updatedTicket.rows.map(row => ({
-          id: row.id,
-          ticket_number: row.ticket_number,
-          title: row.title,
-          description: row.description,
-          status: row.status,
-          priority: row.priority,
-          attachments: row.attachments,
-          created_at: row.created_at,
-          updated_at: row.updated_at,
-          department: row.department_id ? {
-            id: row.department_id,
-            name: row.department_name
-          } : null,
-          category: row.category_id ? {
-            id: row.category_id,
-            name: row.category_name,
-            description: row.category_description
-          } : null,
-          created_by: {
-            id: row.created_by,
-            name: row.created_by_name,
-            email: row.created_by_email
-          },
-          assignee: row.assignee_id ? {
-            id: row.assignee_id,
-            name: row.assignee_name,
-            email: row.assignee_email
-          } : null
-        }));
-    
-    res.json('ok');
-    emitTicketUpdate(io, assigneeId, ["ticket:statusChanged"], {
-      data: transformedData[0],
+    const usersToNotify = new Set<string>();
+    usersToNotify.add(`${updatedTicket.created_by?.id}:ticket:update`);
+    usersToNotify.add(`${updatedTicket.assignee?.id}:ticket:update`);
+    usersToNotify.add(`tickets:update`);
+
+    res.status(200).json();
+
+    emitTicketUpdate(io, assigneeId, [...usersToNotify], {
+      data: updatedTicket,
       message: "A ticket has been updated",
       success: true
     });
@@ -111,36 +67,28 @@ export async function updateTicket(req: Request, res: Response) {
 
 export async function addTicketComment(req: Request, res: Response) {
   const { id } = req.params;
-  const { body, visibility, authorId } = req.body;
-  if (!body || !authorId) {
-    return res.status(400).json({ message: "body and authorId are required" });
+  const { comment, type, userId } = req.body;
+  const user = await db.query("SELECT id, name, email FROM users WHERE id = $1", [userId]);
+  if (user.rowCount === 0) {
+    res.status(400).json({ message: "Invalid user" });
+    return;
   }
-  try {
-    const result = await addTicketCommentModel(
-      id,
-      body,
-      visibility || "public",
-      authorId
-    );
-    
-    // Add activity tracking
-    const action = "commented on the ticket";
-    await addTicketActivityModel(id, 'comment', authorId, action, body);
-    
-    const newComment = result.rows[0];
-    
-    // Emit real-time event for new comment
-    emitTicketUpdate(io, authorId, ["ticket:commentAdded"], {
-      ticketId: id,
-      comment: newComment,
-      message: "New comment added to ticket",
-      timestamp: new Date().toISOString()
+  const action = "added a comment";
+ try {
+   await addTicketActivityModel(id, type, userId, action, comment);
+    const updatedActivities = await getTicketActivitiesModel(id);
+    const usersToNotify = new Set<string>();
+    usersToNotify.add(`${userId}:ticket:update`);
+    usersToNotify.add(`ticket:activity:update`);
+    emitTicketActivityUpdate(io, Array.from(usersToNotify), {
+      data: updatedActivities,
+      message: "A new comment has been added",
+      success: true,
     });
-    
-    res.status(201).json(newComment);
-  } catch (err) {
-    res.status(500).json({ message: "Database error", error: err });
-  }
+    res.status(201).json();
+ } catch (error) {
+    res.status(500).json({ message: "Database error", error: error });
+ }
 }
 
 export async function addTicketAttachment(req: Request, res: Response) {
@@ -195,65 +143,29 @@ export async function assignTicket(req: Request, res: Response) {
       [id]
     );
     const createdBy = createdByResult.rows[0]?.created_by;
-    const ticketResult = await db.query(`
-      SELECT 
-        t.*,
-        d.name as department_name,
-        d.id as department_id,
-        c.name as category_name,
-        c.description as category_description,
-        c.id as category_id,
-        u_creator.name as created_by_name,
-        u_creator.email as created_by_email,
-        u_assignee.name as assignee_name,
-        u_assignee.email as assignee_email,
-        u_assignee.id as assignee_id
-      FROM tickets t
-      LEFT JOIN departments d ON t.department_id = d.id
-      LEFT JOIN categories c ON t.category_id = c.id
-      LEFT JOIN users u_creator ON t.created_by = u_creator.id
-      LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
-      WHERE t.id = $1
-    `, [id]);
-    const ticket = ticketResult.rows[0];
     
     const result = await assignTicketModel(id, assigneeId);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Ticket not found" });
     }
-     
+    
     
     // Add activity tracking
     const assignee = assigneeResult.rows[0] || 'Unknown User';
     const action = `assigned the ticket to ${assignee.name}`;
     await addTicketActivityModel(id, 'assignment', userId, action);
     
-    // Emit real-time event for ticket assignment
+    const ticket = await getFormatedTicketsIdModel(id);
     const usersInvolved = [
-      `user:${assigneeId}:ticket:update`, 
-      `user:${userId}:ticket:update`,
-      `user:${createdBy}:ticket:update`,
-      'all:ticket:updates'
+      `${assigneeId}:ticket:assign`, 
+      `${createdBy}:ticket:update`,
+      `tickets:update`
     ];
-    emitTicketUpdate(io, userId, usersInvolved, 
-      {
-        status: 'assigned',
-        data: {
-          ticketId: id,
-          assigneeId: assigneeId,
-          assignee: assignee,
-          assignedBy: userId,
-          message: `Ticket assigned to ${assignee.name}`,
-          timestamp: new Date().toISOString()
-        },
-        message: `Ticket assigned to ${assignee.name}`
-      }
-    );
-    
-    // Notify the assignee specifically
-    emitUserTicketAssign(io, assigneeId, `tickets:assignment:${assigneeId}`, {
+
+    emitUserTicketAssign(io, assigneeId, usersInvolved, {
       data: ticket,
-      message: "A ticket has been assigned to you",
+      message: "A ticket has been assigned",
+      success: true,
       timestamp: new Date().toISOString()
     });
     
@@ -361,6 +273,9 @@ export async function getTickets(req: Request, res: Response) {
         c.id as category_id,
         u_creator.name as created_by_name,
         u_creator.email as created_by_email,
+        u_owner.name as owned_by_name,
+        u_owner.email as owned_by_email,
+        u_owner.id as owned_by_id,
         u_assignee.name as assignee_name,
         u_assignee.email as assignee_email,
         u_assignee.id as assignee_id
@@ -369,6 +284,7 @@ export async function getTickets(req: Request, res: Response) {
       LEFT JOIN categories c ON t.category_id = c.id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
+      LEFT JOIN users u_owner ON t.created_for = u_owner.id
       ORDER BY t.created_at DESC
     `);
     
@@ -397,6 +313,11 @@ export async function getTickets(req: Request, res: Response) {
         name: row.created_by_name,
         email: row.created_by_email
       },
+      created_for: row.owned_by_id ? {
+        id: row.owned_by_id,
+        name: row.owned_by_name,
+        email: row.owned_by_email
+      } : null,
       assignee: row.assignee_id ? {
         id: row.assignee_id,
         name: row.assignee_name,
@@ -417,7 +338,7 @@ export async function getTickets(req: Request, res: Response) {
 export async function getTicketsByUser(req: Request, res: Response) {
   const { userId } = req.params;
   try {
-    const result = await db.query(`
+const result = await db.query(`
       SELECT 
         t.*,
         d.name as department_name,
@@ -427,6 +348,9 @@ export async function getTicketsByUser(req: Request, res: Response) {
         c.id as category_id,
         u_creator.name as created_by_name,
         u_creator.email as created_by_email,
+        u_owner.name as owned_by_name,
+        u_owner.email as owned_by_email,
+        u_owner.id as owned_by_id,
         u_assignee.name as assignee_name,
         u_assignee.email as assignee_email,
         u_assignee.id as assignee_id
@@ -435,7 +359,8 @@ export async function getTicketsByUser(req: Request, res: Response) {
       LEFT JOIN categories c ON t.category_id = c.id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
-      WHERE t.created_by = $1
+      LEFT JOIN users u_owner ON t.created_for = u_owner.id
+      WHERE t.created_by = $1 OR t.created_for = $1
       ORDER BY t.created_at DESC
     `, [userId]);
     
@@ -464,6 +389,11 @@ export async function getTicketsByUser(req: Request, res: Response) {
         name: row.created_by_name,
         email: row.created_by_email
       },
+      created_for: row.owned_by_id ? {
+        id: row.owned_by_id,
+        name: row.owned_by_name,
+        email: row.owned_by_email
+      } : null,
       assignee: row.assignee_id ? {
         id: row.assignee_id,
         name: row.assignee_name,
@@ -483,7 +413,7 @@ export async function getTicketsByUser(req: Request, res: Response) {
 
 
 export async function createTicket(req: Request, res: Response) {
-  const { title, description, departmentId, createdBy, priority, categoryId, attachments } = req.body;
+  const { title, description, departmentId, createdBy, createdFor, priority, categoryId, attachments } = req.body;
   if (!title || !title.trim() || !createdBy || !createdBy.trim() || !priority || !priority.trim() || !categoryId || !categoryId.trim()) {
     return res.status(400).json({
       message:
@@ -497,7 +427,7 @@ export async function createTicket(req: Request, res: Response) {
     const userCheck = await db.query("SELECT id FROM users WHERE id = $1", [createdBy]);
     if (userCheck.rows.length === 0) {
       return res.status(400).json({
-        message: "Invalid createdBy: User does not exist",
+        message: "validation error: createdBy user does not exist",
         value: { createdBy }
       });
     }
@@ -513,14 +443,15 @@ export async function createTicket(req: Request, res: Response) {
     
     // Create the ticket with the generated ticket number
     const result = await db.query(
-      `INSERT INTO tickets (ticket_number, title, description, department_id, created_by, status, priority, category_id, attachments) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      `INSERT INTO tickets (ticket_number, title, description, department_id, created_by, created_for, status, priority, category_id, attachments) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [
         ticketNumber, 
         title, 
         description, 
         departmentId && departmentId.trim() !== '' ? departmentId : null, 
         createdBy, 
+        createdFor && createdFor.trim() !== '' ? createdFor : null,
         "New", 
         priority, 
         categoryId && categoryId.trim() !== '' ? categoryId : null, 
@@ -533,13 +464,25 @@ export async function createTicket(req: Request, res: Response) {
     
     // Add initial activity tracking for ticket creation
     const action = "created the ticket";
-    await addTicketActivityModel(ticketId, 'status', createdBy, action);
-    const newTicket = result.rows[0];
+    if (createdBy && createdFor) {
+      const createdUser = await db.query("SELECT id FROM users WHERE id = $1", [createdBy]);
+      await addTicketActivityModel(ticketId, 'status', createdFor, `ticket a created for ${createdUser.rows[0].name}`);
+    }else {
+      await addTicketActivityModel(ticketId, 'status', createdBy, 'created the ticket');
+    }
+    const newTicket = await getFormatedTicketsIdModel(ticketId);
     
     // Emit real-time event for new ticket creation
-    emitTicketCreatedEvent(io, createdBy, "ticket:created", {
-      ticket: newTicket,
+    const usersToNotify = new Set<string>();
+    usersToNotify.add(`${createdBy}:new`);
+    if (createdFor) {
+      usersToNotify.add(`${createdFor}:new`);
+    }
+    usersToNotify.add(`tickets:new`);
+    emitTicketCreatedEvent(io, createdBy, Array.from(usersToNotify), {
+      data: newTicket,
       message: "New ticket created",
+      success: true,
       timestamp: new Date().toISOString()
     });
     
@@ -562,6 +505,9 @@ export async function getTicketById(req: Request, res: Response) {
         c.id as category_id,
         u_creator.name as created_by_name,
         u_creator.email as created_by_email,
+        u_owner.name as owned_by_name,
+        u_owner.email as owned_by_email,
+        u_owner.id as owned_by_id,
         u_assignee.name as assignee_name,
         u_assignee.email as assignee_email,
         u_assignee.id as assignee_id
@@ -570,6 +516,7 @@ export async function getTicketById(req: Request, res: Response) {
       LEFT JOIN categories c ON t.category_id = c.id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
+      LEFT JOIN users u_owner ON t.created_for = u_owner.id
       WHERE t.id = $1
     `, [id]);
     
@@ -604,6 +551,11 @@ export async function getTicketById(req: Request, res: Response) {
         name: row.created_by_name,
         email: row.created_by_email
       },
+      created_for: row.owned_by_id ? {
+        id: row.owned_by_id,
+        name: row.owned_by_name,
+        email: row.owned_by_email
+      } : null,
       assignee: row.assignee_id ? {
         id: row.assignee_id,
         name: row.assignee_name,
@@ -627,24 +579,9 @@ export async function getTicketActivities(req: Request, res: Response) {
   try {
     const result = await getTicketActivitiesModel(id);
     
-    // Transform the data to include nested user objects
-    const transformedData = result.rows.map(row => ({
-      id: row.id,
-      ticket_id: row.ticket_id,
-      type: row.type,
-      action: row.action,
-      comment: row.comment,
-      created_at: row.created_at,
-      user: {
-        id: row.user_id,
-        name: row.user_name,
-        email: row.user_email
-      }
-    }));
-    
     res.json({
       message: '',
-      data: transformedData,
+      data: result,
       status: 'success'
     });
   } catch (err) {
