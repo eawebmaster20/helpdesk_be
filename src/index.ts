@@ -17,7 +17,7 @@ import usersRoutes from "./routes/users.routes";
 import cors from "cors";
 import { db, initializeDatabase, resetDatabase } from "./db/index";
 import { sendPasswordSetupEmail, sendTestEmail } from "./utils/email";
-import { setupTicketSocketHandlers } from "./websockets/ticket.socket";
+import { newSetupHandlers } from "./websockets/ticket.socket";
 
 const app: Application = express();
 const httpServer = createServer(app);
@@ -177,7 +177,8 @@ const startServer = async () => {
       process.exit(1);
     }
     // Setup WebSocket handlers
-    setupTicketSocketHandlers(io);
+    // setupTicketSocketHandlers(io);
+    newSetupHandlers(io);
 
     httpServer.listen(PORT, () => {
       console.log("\nServer is running!");
