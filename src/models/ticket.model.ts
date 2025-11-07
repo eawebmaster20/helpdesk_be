@@ -52,6 +52,42 @@ export interface TicketApproval {
   comment?: string;
 }
 
+export interface FormattedTicket {
+  id: string;
+  ticket_number: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  attachments: string[];
+  created_at: string;
+  updated_at: string;
+  department: {
+    id: string;
+    name: string;
+  } | null;
+  category: {
+    id: string;
+    name: string;
+    description: string;
+  } | null;
+  created_by: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  created_for: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  assignee: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+}
+
 export async function getTicketsModel() {
   return db.query("SELECT * FROM tickets ORDER BY created_at DESC");
 }
