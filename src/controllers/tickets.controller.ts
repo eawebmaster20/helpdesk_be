@@ -11,6 +11,8 @@ import { Request, Response } from "express";
 import { db } from "../db";
 import { io } from "../index";
 import { emitTicketActivityUpdate, emitTicketCreatedEvent, emitTicketUpdate, emitUserTicketAssign } from "../websockets/ticket.socket";
+import { users } from "../storage/memory";
+import { addEmailToQueue, sendEmail } from "../utils/bull-email";
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
@@ -52,6 +54,9 @@ export async function updateTicket(req: Request, res: Response) {
     usersToNotify.add(`${updatedTicket.created_by?.id}:ticket:update`);
     usersToNotify.add(`${updatedTicket.assignee?.id}:ticket:update`);
     usersToNotify.add(`tickets:update`);
+    if (updatedTicket.created_for?.id) {
+      usersToNotify.add(`${updatedTicket.created_for.id}:ticket:update`);
+    }
 
     res.status(200).json();
 
@@ -73,6 +78,11 @@ export async function addTicketComment(req: Request, res: Response) {
     res.status(400).json({ message: "Invalid user" });
     return;
   }
+  const ticket = await getFormatedTicketsIdModel(id);
+  if (!ticket) {
+    res.status(404).json({ message: "Ticket not found" });
+    return;
+  }
   const action = "added a comment";
  try {
    await addTicketActivityModel(id, type, userId, action, comment);
@@ -80,6 +90,12 @@ export async function addTicketComment(req: Request, res: Response) {
     const usersToNotify = new Set<string>();
     usersToNotify.add(`${userId}:ticket:update`);
     usersToNotify.add(`ticket:activity:update`);
+    if (ticket.assignee?.id) {
+      usersToNotify.add(`${ticket.assignee.id}:ticket:update`);
+    }
+    if (ticket.created_for?.id) {
+      usersToNotify.add(`${ticket.created_for.id}:ticket:update`);
+    }
     emitTicketActivityUpdate(io, Array.from(usersToNotify), {
       data: updatedActivities,
       message: "A new comment has been added",
@@ -424,8 +440,8 @@ export async function createTicket(req: Request, res: Response) {
   
   try {
     // Validate that the user exists
-    const userCheck = await db.query("SELECT id FROM users WHERE id = $1", [createdBy]);
-    if (userCheck.rows.length === 0) {
+    const existingUser = await db.query("SELECT id, email FROM users WHERE id = $1", [createdBy]);
+    if (existingUser.rows.length === 0) {
       return res.status(400).json({
         message: "validation error: createdBy user does not exist",
         value: { createdBy }
@@ -485,8 +501,11 @@ export async function createTicket(req: Request, res: Response) {
       success: true,
       timestamp: new Date().toISOString()
     });
-    
     res.status(201).json(newTicket);
+    const formatedTicket = await getFormatedTicketsIdModel(ticketId);
+    sendEmail('ticket_created', existingUser.rows[0].email, `Ticket ${ticketNumber} Created`, formatedTicket);
+
+
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
