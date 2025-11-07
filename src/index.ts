@@ -18,6 +18,7 @@ import cors from "cors";
 import { db, initializeDatabase, resetDatabase } from "./db/index";
 import { sendPasswordSetupEmail, sendTestEmail } from "./utils/email";
 import { newSetupHandlers } from "./websockets/ticket.socket";
+import { addEmailToQueue } from "./utils/bull-email";
 
 const app: Application = express();
 const httpServer = createServer(app);
@@ -111,8 +112,13 @@ app.get("/health", async (req, res) => {
 app.get("/test-email", async (req: Request, res: Response) => {
   try {
     // Simulate sending a test email
-    console.log("Sending test email...", req.body.to);
-    const emailSent = await sendTestEmail(req.body.to);
+    const emailSent = await addEmailToQueue({
+          from: process.env.EMAIL_USER || '',
+          to: req.body.to,
+          subject: `Ticket Created`,
+          text: `Your ticket has been created with ticket number.`
+        })
+    // const emailSent = await sendTestEmail(req.body.to);
     if (emailSent) {
       res.json({ message: "Test email sent successfully" });
     } else {
