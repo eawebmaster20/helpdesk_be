@@ -23,7 +23,7 @@ export async function login(req: Request, res: Response) {
     
     // Parse LDAP DN to get user information
     const payload = parseLDAPDN(ldapUser.dn);
-    const userEmail = ldapUser.userPrincipalName || ldapUser.mail || '';
+    const userEmail = ldapUser.mail || ldapUser.userPrincipalName || '';
     
     // Check if user exists in database
     const existingUserResult = await db.query(
