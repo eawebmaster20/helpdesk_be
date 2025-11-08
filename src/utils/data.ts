@@ -118,3 +118,55 @@ export const getTicketCreatedHtmlContent = (ticket: FormattedTicket) => `
         </tr>
     </table>
 </div>`;
+
+export const getTicketUpdatedHtmlContent = (ticket: FormattedTicket) => `
+<div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', line-height: 1.6, Arial, sans-serif; background-color: #f5f5f5;">
+    <h2 style="color: #1a1a1a;">Ticket Updated: #${ticket.ticket_number}</h2>
+    <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
+    <p>We're reaching out to inform you that your ticket has been updated. Here are the details:</p>
+    <ul>
+        <li><strong>Title:</strong> ${ticket.title}</li>
+        <li><strong>Description:</strong> ${ticket.description}</li>
+        <li><strong>Status:</strong> ${ticket.status}</li>
+        <li><strong>Priority:</strong> ${ticket.priority}</li>
+        <li><strong>Assignee:</strong> ${ticket.assignee?.name}</li>
+    </ul>
+    <p>Thank you for your patience as we work to resolve your issue.</p>
+    <p>Best regards,<br>The IT Department</p>
+</div>
+`;
+
+export const getCommentAddedHtmlContent = (ticket: FormattedTicket, comment: string) => `
+<div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <h2 style="color: #1a1a1a;">New Comment on Ticket: #${ticket.ticket_number}</h2>
+    <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
+    <p>A new comment has been added to your ticket:</p>
+    <blockquote style="border-left: 4px solid #3b82f6; padding-left: 12px; color: #4a5568;">
+        ${comment}
+    </blockquote>
+    <p>Thank you for your patience as we work to resolve your issue.</p>
+    <p>Best regards,<br>The IT Department</p>
+</div>
+`;
+export const getAttachmentAddedHtmlContent = (ticket: FormattedTicket, attachmentName: string) => `
+<div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <h2 style="color: #1a1a1a;">New Attachment on Ticket: #${ticket.ticket_number}</h2>
+    <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
+    <p>A new attachment has been added to your ticket:</p>
+    <blockquote style="border-left: 4px solid #3b82f6; padding-left: 12px; color: #4a5568;">
+        ${attachmentName}
+    </blockquote>
+    <p>Thank you for your patience as we work to resolve your issue.</p>
+    <p>Best regards,<br>The IT Department</p>
+</div>
+`;
+
+export const getTicketAssignedHtmlContent = (ticket: FormattedTicket) => `
+<div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <h2 style="color: #1a1a1a;">Ticket Assigned: #${ticket.ticket_number}</h2>
+    <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
+    <p>Your ticket has been assigned to a new user.</p>
+    <p>Thank you for your patience as we work to resolve your issue.</p>
+    <p>Best regards,<br>The IT Department</p>
+</div>
+`;
