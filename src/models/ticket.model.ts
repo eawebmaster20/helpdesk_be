@@ -40,8 +40,8 @@ export interface Ticket {
   priority: "Low" | "Medium" | "High" | "Critical";
   assigneeId?: string;
   approvals: TicketApproval[];
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface TicketApproval {
@@ -155,8 +155,8 @@ export async function getFormatedTicketsModel(userId?: string) {
     status: row.status,
     priority: row.priority,
     attachments: row.attachments,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
+    created_at: new Date(row.created_at).toISOString(),
+    updated_at: new Date(row.updated_at).toISOString(),
     department: row.department_id ? {
       id: row.department_id,
       name: row.department_name
