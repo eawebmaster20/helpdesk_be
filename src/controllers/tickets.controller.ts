@@ -189,6 +189,11 @@ export async function assignTicket(req: Request, res: Response) {
       timestamp: new Date().toISOString()
     });
     
+    const usersToEmail = [
+      // ticket.assignee?.id,
+      ticket.created_by?.id
+    ].filter(Boolean) as string[];
+    sendEmail('ticket_assigned', usersToEmail, `Ticket ${ticket.ticket_number} Created`, ticket);
     res.json({ message: "Assigned", data:[] });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
