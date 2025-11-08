@@ -11,13 +11,11 @@ import { Request, Response } from "express";
 import { db } from "../db";
 import { io } from "../index";
 import { emitTicketActivityUpdate, emitTicketCreatedEvent, emitTicketUpdate, emitUserTicketAssign } from "../websockets/ticket.socket";
-import { users } from "../storage/memory";
-import { addEmailToQueue, sendEmail } from "../utils/bull-email";
+import { sendEmail } from "../utils/bull-email";
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
   const { title, userId, description, status, priority, assigneeId } = req.body;
-  const ticketResult = await getFormatedTicketsIdModel(id);
   try {
     const result = await updateTicketModel(
       id,
@@ -57,6 +55,11 @@ export async function updateTicket(req: Request, res: Response) {
     if (updatedTicket.created_for?.id) {
       usersToNotify.add(`${updatedTicket.created_for.id}:ticket:update`);
     }
+    const usersToEmail = [
+      updatedTicket.created_by?.email,
+      updatedTicket.assignee?.email,
+      updatedTicket.created_for?.email
+    ].filter(Boolean) as string[];
 
     res.status(200).json();
 
@@ -65,6 +68,7 @@ export async function updateTicket(req: Request, res: Response) {
       message: "A ticket has been updated",
       success: true
     });
+    sendEmail('status_update', usersToEmail, `There is an update on your ticket ${updatedTicket.ticket_number}`, updatedTicket);
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
@@ -439,14 +443,6 @@ export async function createTicket(req: Request, res: Response) {
   }
   
   try {
-    // Validate that the user exists
-    const existingUser = await db.query("SELECT id, email FROM users WHERE id = $1", [createdBy]);
-    if (existingUser.rows.length === 0) {
-      return res.status(400).json({
-        message: "validation error: createdBy user does not exist",
-        value: { createdBy }
-      });
-    }
     
     // Generate next ticket number
     const counterResult = await db.query(
@@ -490,9 +486,14 @@ export async function createTicket(req: Request, res: Response) {
     
     // Emit real-time event for new ticket creation
     const usersToNotify = new Set<string>();
+    const usersToEmail:string[] = []
     usersToNotify.add(`${createdBy}:new`);
+    usersToEmail.push((newTicket.created_by && newTicket.created_by.email) ? newTicket.created_by.email : '');
     if (createdFor) {
       usersToNotify.add(`${createdFor}:new`);
+      if (newTicket.created_for && newTicket.created_for.email) {
+        usersToEmail.push(newTicket.created_for.email);
+      }
     }
     usersToNotify.add(`tickets:new`);
     emitTicketCreatedEvent(io, createdBy, Array.from(usersToNotify), {
@@ -503,7 +504,7 @@ export async function createTicket(req: Request, res: Response) {
     });
     res.status(201).json(newTicket);
     const formatedTicket = await getFormatedTicketsIdModel(ticketId);
-    sendEmail('ticket_created', existingUser.rows[0].email, `Ticket ${ticketNumber} Created`, formatedTicket);
+    sendEmail('ticket_created', usersToEmail, `Ticket ${ticketNumber} Created`, formatedTicket);
 
 
   } catch (err) {
