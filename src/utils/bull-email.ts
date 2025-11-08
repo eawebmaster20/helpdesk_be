@@ -50,7 +50,7 @@ emailQueue.process(async (job: any) => {
         }
         const emailData = job.data;
         
-        // Validate required fields
+        
         if (!emailData.to || !emailData.subject) {
             throw new Error("Missing required email fields: to, subject");
         }
@@ -66,11 +66,14 @@ emailQueue.process(async (job: any) => {
 });
 
 export const addEmailToQueue = async (emailJob: EmailJob): Promise<boolean> => {
-    if (process.env.ACTIVATE_EMAIL !== 'true') {
+    if (!process.env.ACTIVATE_EMAIL || process.env.ACTIVATE_EMAIL.toLowerCase() !== 'true') {
         console.log('Email sending is deactivated. Email not added to queue.');
+        console.log(`ACTIVATE_EMAIL is: "${process.env.ACTIVATE_EMAIL}"`);
         return true;
     }
+    
     try {
+        // console.log('Adding email to queue:', emailJob.to, emailJob.subject);
         await emailQueue.add(emailJob, {
             attempts: 3,
             backoff: {
@@ -80,9 +83,10 @@ export const addEmailToQueue = async (emailJob: EmailJob): Promise<boolean> => {
             removeOnComplete: 10, // Keep only 10 completed jobs
             removeOnFail: 5, // Keep only 5 failed jobs
         });
+        console.log('Email successfully added to queue');
         return true;
     } catch (error) {
-        console.error('Failed to add email to queue:', error);
+        console.error(' Failed to add email to queue:', error);
         return false;
     }
 }
@@ -90,16 +94,22 @@ export const addEmailToQueue = async (emailJob: EmailJob): Promise<boolean> => {
 export const testQueueConnection = async (): Promise<boolean> => {
     try {
         await emailQueue.add('test', { test: true }, { delay: 1000 });
-        console.log('✅ Queue connection test job added successfully');
+        console.log('Queue connection test job added successfully');
         return true;
     } catch (error) {
-        console.error('❌ Queue connection test failed:', error);
+        console.error('Queue connection test failed:', error);
         return false;
     }
 };
 
 
 export const sendEmail = async (type: string, to: string[], subject: string, ticket: FormattedTicket, comment?: string, attachmentName?: string) => {
+    // Early check for email activation
+    if (!process.env.ACTIVATE_EMAIL || process.env.ACTIVATE_EMAIL.toLowerCase() !== 'true') {
+        console.log(`Email sending is deactivated. Skipping ${type} email for ticket ${ticket.ticket_number}`);
+        return;
+    }
+
     let htmlContent = '';
     switch (type) {
         case 'ticket_created':
@@ -139,10 +149,13 @@ export const sendEmail = async (type: string, to: string[], subject: string, tic
             console.warn('No valid user emails found for the provided IDs.');
             return;
         }
+        console.log('emails:', userEmails);
+        console.log(`Sending ${type} email to ${userEmails.length} recipients for ticket ${ticket.ticket_number}`);
+        
         for (const recipient of userEmails) {
             await addEmailToQueue({
                 from: process.env.EMAIL_USER || '',
-                to: recipient,
+                to: recipient.email,
                 subject,
                 html: htmlContent
             });
