@@ -12,6 +12,14 @@ export async function getUserGroupModel(role: string) {
   return db.query("SELECT * FROM users WHERE role = $1 ORDER BY created_at DESC", [role]);
 }
 
+export async function getFormattedUsersByIdModel(ids: string[]) {
+  const users = await db.query("SELECT * FROM users WHERE id = ANY($1)", [ids]);
+  if (users.rowCount === 0) {
+    return null;
+  }
+  return users.rows;
+}
+
 export async function insertUserModel(
   name: string,
   email: string,
