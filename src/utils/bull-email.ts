@@ -1,8 +1,10 @@
 import bull from "bull";
 import nodemailer from "nodemailer";
 import { EmailJob } from "../types/emailJob";
-import { getTicketCreatedHtmlContent } from "./data";
+import { getAttachmentAddedHtmlContent, getCommentAddedHtmlContent, getTicketAssignedHtmlContent, getTicketCreatedHtmlContent, getTicketUpdatedHtmlContent } from "./data";
 import { FormattedTicket } from "../models/ticket.model";
+import { get } from "http";
+import { getFormattedUsersByIdModel } from "../models/users.model";
 
 // Configure Redis connection for Bull
 const emailQueue = new bull('emailQueue', {
@@ -64,6 +66,10 @@ emailQueue.process(async (job: any) => {
 });
 
 export const addEmailToQueue = async (emailJob: EmailJob): Promise<boolean> => {
+    if (process.env.ACTIVATE_EMAIL !== 'true') {
+        console.log('Email sending is deactivated. Email not added to queue.');
+        return true;
+    }
     try {
         await emailQueue.add(emailJob, {
             attempts: 3,
@@ -93,36 +99,54 @@ export const testQueueConnection = async (): Promise<boolean> => {
 };
 
 
-export const sendEmail = async (type: string, to: string, subject: string, ticket: FormattedTicket) => {
+export const sendEmail = async (type: string, to: string[], subject: string, ticket: FormattedTicket, comment?: string, attachmentName?: string) => {
     let htmlContent = '';
     switch (type) {
         case 'ticket_created':
             htmlContent = getTicketCreatedHtmlContent(ticket);
             break;
         case 'ticket_assigned':
-            htmlContent = `<p>Your ticket has been assigned to a new user.</p>`;
+            htmlContent = getTicketAssignedHtmlContent(ticket);
             break;
         // Add more cases as needed
         case 'status_update':
-            htmlContent = `<p>Your ticket status has been updated.</p>`;
+            htmlContent = getTicketUpdatedHtmlContent(ticket);
             break;
         case 'comment_added':
-            htmlContent = `<p>A new comment has been added to your ticket.</p>`;
+            if (comment) {
+                htmlContent = getCommentAddedHtmlContent(ticket, comment);
+            }
+            else {
+                console.warn('Comment content is missing for comment_added email type.');
+                return;
+            }
             break;
         case 'attachment_added':
-            htmlContent = `<p>A new attachment has been added to your ticket.</p>`;
+            if (attachmentName) {
+                htmlContent = getAttachmentAddedHtmlContent(ticket, attachmentName);
+            }
+            else {
+                console.warn('Attachment name is missing for attachment_added email type.');
+                return;
+            }
             break;
         default:
             console.warn(`Unknown email type: ${type}`);
     }
     try {
-        await addEmailToQueue({
-            from: process.env.EMAIL_USER || '',
-            to,
-            subject,
-            html: htmlContent
-        });
-        console.log(`Email job added to queue for ${to}`);
+        const userEmails = await getFormattedUsersByIdModel(to);
+        if (!userEmails) {
+            console.warn('No valid user emails found for the provided IDs.');
+            return;
+        }
+        for (const recipient of userEmails) {
+            await addEmailToQueue({
+                from: process.env.EMAIL_USER || '',
+                to: recipient,
+                subject,
+                html: htmlContent
+            });
+        }
     } catch (error) {
         console.error('Failed to add email to queue:', error);
     }
