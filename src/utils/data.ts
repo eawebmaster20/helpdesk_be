@@ -120,32 +120,176 @@ export const getTicketCreatedHtmlContent = (ticket: FormattedTicket) => `
 </div>`;
 
 export const getTicketUpdatedHtmlContent = (ticket: FormattedTicket) => `
-<div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', line-height: 1.6, Arial, sans-serif; background-color: #f5f5f5;">
-    <h2 style="color: #1a1a1a;">Ticket Updated: #${ticket.ticket_number}</h2>
-    <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
-    <p>We're reaching out to inform you that your ticket has been updated. Here are the details:</p>
-    <ul>
-        <li><strong>Title:</strong> ${ticket.title}</li>
-        <li><strong>Description:</strong> ${ticket.description}</li>
-        <li><strong>Status:</strong> ${ticket.status}</li>
-        <li><strong>Priority:</strong> ${ticket.priority}</li>
-        <li><strong>Assignee:</strong> ${ticket.assignee?.name}</li>
-    </ul>
-    <p>Thank you for your patience as we work to resolve your issue.</p>
-    <p>Best regards,<br>The IT Department</p>
+<div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 0;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-collapse: collapse;">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: #ec2127; padding: 40px 30px; text-align: center;">
+                            <h2 style="color: #ffffff; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: -0.5px;"> Star Assurance IT Support</h2>
+                            <p style="color: #dbeafe; font-size: 14px; margin: 8px 0 0 0;">Helpdesk Services</p>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; background-color: #f5f5f5;">
+                                <h2 style="color: #1a1a1a;">Ticket Updated: #${ticket.ticket_number}</h2>
+                                <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
+                                <p>We're reaching out to inform you that your ticket has been updated. Here are the details:</p>
+                                <ul>
+                                    <li><strong>Title:</strong> ${ticket.title}</li>
+                                    <li><strong>Description:</strong> ${ticket.description}</li>
+                                    <li><strong>Status:</strong> ${ticket.status}</li>
+                                    <li><strong>Priority:</strong> ${ticket.priority}</li>
+                                    <li><strong>Assignee:</strong> ${ticket.assignee?.name}</li>
+                                </ul>
+                                <p>Thank you for your patience as we work to resolve your issue.</p>
+                                <p>Best regards,<br>The IT Department</p>
+                            </div>
+
+                            <div style="height: 1px; background-color: #e2e8f0; margin: 25px 0;"></div>
+
+                            <table role="presentation" style="width: 100%; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px; margin: 25px 0; border-collapse: collapse;">
+                                <tr>
+                                    <td style="padding: 15px 20px;">
+                                        <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
+                                            <strong>Need Urgent Assistance?</strong><br>
+                                            For critical issues, please call our help desk at <strong>(555) 123-4567</strong> or use the live chat feature on our support portal.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- <p style="color: #718096; font-size: 14px; line-height: 1.6; margin: 0;">
+                                If you have any questions or need additional assistance, please reply to this email or contact our IT Support team directly.
+                            </p> -->
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f7fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+                            <p style="color: #718096; font-size: 13px; line-height: 1.6; margin: 0 0 15px 0;">
+                                <strong style="color: #1a1a1a;">IT Support Department</strong><br>
+                                Email: itsupport@starassurance.com<br>
+                                Phone: (555) 123-4567<br>
+                                <!-- Hours: Monday - Friday, 8:00 AM - 6:00 PM EST -->
+                            </p>
+
+                            <div style="margin: 20px 0;">
+                                <a href="#" style="display: inline-block; margin: 0 8px; color: #3b82f6; text-decoration: none; font-size: 14px;">Support Portal</a>
+                                <span style="color: #718096;">•</span>
+                                <a href="#" style="display: inline-block; margin: 0 8px; color: #3b82f6; text-decoration: none; font-size: 14px;">Knowledge Base</a>
+                                <span style="color: #718096;">•</span>
+                                <a href="#" style="display: inline-block; margin: 0 8px; color: #3b82f6; text-decoration: none; font-size: 14px;">FAQs</a>
+                            </div>
+
+                            <p style="color: #718096; font-size: 13px; line-height: 1.6; margin: 0;">
+                                This is an automated notification from our ticketing system.<br>
+                                <!-- <a href="#" style="color: #3b82f6; text-decoration: none;">Manage Notifications</a>
+                                <span style="color: #718096;">|</span>
+                                <a href="#" style="color: #3b82f6; text-decoration: none;">Contact IT Admin</a> -->
+                            </p>
+
+                            <!-- <p style="color: #718096; font-size: 11px; line-height: 1.6; margin: 20px 0 0 0;">
+                                © 2025 IT Support Department. All rights reserved.<br>
+                                This email contains confidential information intended only for the recipient.
+                            </p> -->
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </div>
 `;
 
 export const getCommentAddedHtmlContent = (ticket: FormattedTicket, comment: string) => `
 <div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-    <h2 style="color: #1a1a1a;">New Comment on Ticket: #${ticket.ticket_number}</h2>
-    <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
-    <p>A new comment has been added to your ticket:</p>
-    <blockquote style="border-left: 4px solid #3b82f6; padding-left: 12px; color: #4a5568;">
-        ${comment}
-    </blockquote>
-    <p>Thank you for your patience as we work to resolve your issue.</p>
-    <p>Best regards,<br>The IT Department</p>
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 0;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-collapse: collapse;">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: #ec2127; padding: 40px 30px; text-align: center;">
+                            <h2 style="color: #ffffff; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: -0.5px;"> Star Assurance IT Support</h2>
+                            <p style="color: #dbeafe; font-size: 14px; margin: 8px 0 0 0;">Helpdesk Services</p>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+                                <h2 style="color: #1a1a1a;">New Comment on Ticket: #${ticket.ticket_number}</h2>
+                                <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
+                                <p>A new comment has been added to your ticket:</p>
+                                <blockquote style="border-left: 4px solid #3b82f6; padding-left: 12px; color: #4a5568;">
+                                    ${comment}
+                                </blockquote>
+                                <p>Thank you for your patience as we work to resolve your issue.</p>
+                                <p>Best regards,<br>The IT Department</p>
+                            </div>
+
+                            <div style="height: 1px; background-color: #e2e8f0; margin: 25px 0;"></div>
+
+                            <table role="presentation" style="width: 100%; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px; margin: 25px 0; border-collapse: collapse;">
+                                <tr>
+                                    <td style="padding: 15px 20px;">
+                                        <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
+                                            <strong>Need Urgent Assistance?</strong><br>
+                                            For critical issues, please call our help desk at <strong>(555) 123-4567</strong> or use the live chat feature on our support portal.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- <p style="color: #718096; font-size: 14px; line-height: 1.6; margin: 0;">
+                                If you have any questions or need additional assistance, please reply to this email or contact our IT Support team directly.
+                            </p> -->
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f7fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+                            <p style="color: #718096; font-size: 13px; line-height: 1.6; margin: 0 0 15px 0;">
+                                <strong style="color: #1a1a1a;">IT Support Department</strong><br>
+                                Email: itsupport@starassurance.com<br>
+                                Phone: (555) 123-4567<br>
+                                <!-- Hours: Monday - Friday, 8:00 AM - 6:00 PM EST -->
+                            </p>
+
+                            <div style="margin: 20px 0;">
+                                <a href="#" style="display: inline-block; margin: 0 8px; color: #3b82f6; text-decoration: none; font-size: 14px;">Support Portal</a>
+                                <span style="color: #718096;">•</span>
+                                <a href="#" style="display: inline-block; margin: 0 8px; color: #3b82f6; text-decoration: none; font-size: 14px;">Knowledge Base</a>
+                                <span style="color: #718096;">•</span>
+                                <a href="#" style="display: inline-block; margin: 0 8px; color: #3b82f6; text-decoration: none; font-size: 14px;">FAQs</a>
+                            </div>
+
+                            <p style="color: #718096; font-size: 13px; line-height: 1.6; margin: 0;">
+                                This is an automated notification from our ticketing system.<br>
+                                <!-- <a href="#" style="color: #3b82f6; text-decoration: none;">Manage Notifications</a>
+                                <span style="color: #718096;">|</span>
+                                <a href="#" style="color: #3b82f6; text-decoration: none;">Contact IT Admin</a> -->
+                            </p>
+
+                            <!-- <p style="color: #718096; font-size: 11px; line-height: 1.6; margin: 20px 0 0 0;">
+                                © 2025 IT Support Department. All rights reserved.<br>
+                                This email contains confidential information intended only for the recipient.
+                            </p> -->
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </div>
 `;
 export const getAttachmentAddedHtmlContent = (ticket: FormattedTicket, attachmentName: string) => `
@@ -163,10 +307,82 @@ export const getAttachmentAddedHtmlContent = (ticket: FormattedTicket, attachmen
 
 export const getTicketAssignedHtmlContent = (ticket: FormattedTicket) => `
 <div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-    <h2 style="color: #1a1a1a;">Ticket Assigned: #${ticket.ticket_number}</h2>
-    <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
-    <p>Your ticket has been assigned to a new user.</p>
-    <p>Thank you for your patience as we work to resolve your issue.</p>
-    <p>Best regards,<br>The IT Department</p>
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 0;">
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-collapse: collapse;">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: #ec2127; padding: 40px 30px; text-align: center;">
+                            <h2 style="color: #ffffff; font-size: 28px; font-weight: bold; margin: 0; letter-spacing: -0.5px;"> Star Assurance IT Support</h2>
+                            <p style="color: #dbeafe; font-size: 14px; margin: 8px 0 0 0;">Helpdesk Services</p>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+                                <h2 style="color: #1a1a1a;">Ticket Assigned: #${ticket.ticket_number}</h2>
+                                <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
+                                <p>Your ticket has been assigned to a new user, and is currently being reviewed.</p>
+                                <p>Thank you for your patience as we work to resolve your issue.</p>
+                                <p>Best regards,<br>The IT Department</p>
+                            </div>
+
+                            <div style="height: 1px; background-color: #e2e8f0; margin: 25px 0;"></div>
+
+                            <table role="presentation" style="width: 100%; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px; margin: 25px 0; border-collapse: collapse;">
+                                <tr>
+                                    <td style="padding: 15px 20px;">
+                                        <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
+                                            <strong>Need Urgent Assistance?</strong><br>
+                                            For critical issues, please call our help desk at <strong>(555) 123-4567</strong> or use the live chat feature on our support portal.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- <p style="color: #718096; font-size: 14px; line-height: 1.6; margin: 0;">
+                                If you have any questions or need additional assistance, please reply to this email or contact our IT Support team directly.
+                            </p> -->
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f7fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+                            <p style="color: #718096; font-size: 13px; line-height: 1.6; margin: 0 0 15px 0;">
+                                <strong style="color: #1a1a1a;">IT Support Department</strong><br>
+                                Email: itsupport@starassurance.com<br>
+                                Phone: (555) 123-4567<br>
+                                <!-- Hours: Monday - Friday, 8:00 AM - 6:00 PM EST -->
+                            </p>
+
+                            <div style="margin: 20px 0;">
+                                <a href="#" style="display: inline-block; margin: 0 8px; color: #3b82f6; text-decoration: none; font-size: 14px;">Support Portal</a>
+                                <span style="color: #718096;">•</span>
+                                <a href="#" style="display: inline-block; margin: 0 8px; color: #3b82f6; text-decoration: none; font-size: 14px;">Knowledge Base</a>
+                                <span style="color: #718096;">•</span>
+                                <a href="#" style="display: inline-block; margin: 0 8px; color: #3b82f6; text-decoration: none; font-size: 14px;">FAQs</a>
+                            </div>
+
+                            <p style="color: #718096; font-size: 13px; line-height: 1.6; margin: 0;">
+                                This is an automated notification from our ticketing system.<br>
+                                <!-- <a href="#" style="color: #3b82f6; text-decoration: none;">Manage Notifications</a>
+                                <span style="color: #718096;">|</span>
+                                <a href="#" style="color: #3b82f6; text-decoration: none;">Contact IT Admin</a> -->
+                            </p>
+
+                            <!-- <p style="color: #718096; font-size: 11px; line-height: 1.6; margin: 20px 0 0 0;">
+                                © 2025 IT Support Department. All rights reserved.<br>
+                                This email contains confidential information intended only for the recipient.
+                            </p> -->
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </div>
 `;
