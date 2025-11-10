@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   category_id UUID REFERENCES categories(id),
   status VARCHAR(32) NOT NULL,
   priority VARCHAR(16) NOT NULL,
+  sla_policy_id UUID REFERENCES sla_policies(id) ON DELETE CASCADE,
   attachments TEXT[],
   assignee_id UUID REFERENCES users(id),
   created_at TIMESTAMP DEFAULT NOW(),
