@@ -136,7 +136,7 @@ export const getTicketUpdatedHtmlContent = (ticket: FormattedTicket) => `
                     <!-- Content -->
                     <tr>
                         <td style="padding: 40px 30px;">
-                            <div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; background-color: #f5f5f5;">
+                            <div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6;">
                                 <h2 style="color: #1a1a1a;">Ticket Updated: #${ticket.ticket_number}</h2>
                                 <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
                                 <p>We're reaching out to inform you that your ticket has been updated. Here are the details:</p>
@@ -225,7 +225,7 @@ export const getCommentAddedHtmlContent = (ticket: FormattedTicket, comment: str
                     <!-- Content -->
                     <tr>
                         <td style="padding: 40px 30px;">
-                            <div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+                            <div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
                                 <h2 style="color: #1a1a1a;">New Comment on Ticket: #${ticket.ticket_number}</h2>
                                 <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
                                 <p>A new comment has been added to your ticket:</p>
