@@ -93,7 +93,7 @@ export async function addTicketComment(req: Request, res: Response) {
     const updatedActivities = await getTicketActivitiesModel(id);
     const usersToNotify = new Set<string>();
     usersToNotify.add(`${userId}:ticket:update`);
-    usersToNotify.add(`ticket:activity:update`);
+    usersToNotify.add(`tickets:update`);
     if (ticket.assignee?.id) {
       usersToNotify.add(`${ticket.assignee.id}:ticket:update`);
     }
@@ -193,7 +193,7 @@ export async function assignTicket(req: Request, res: Response) {
       // ticket.assignee?.id,
       ticket.created_by?.id
     ].filter(Boolean) as string[];
-    sendEmail('ticket_assigned', usersToEmail, `Ticket ${ticket.ticket_number} Created`, ticket);
+    sendEmail('ticket_assigned', usersToEmail, `Ticket ${ticket.ticket_number} has been assigned`, ticket);
     res.json({ message: "Assigned", data:[] });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
