@@ -92,7 +92,7 @@ export async function getTicketsModel() {
   return db.query("SELECT * FROM tickets ORDER BY created_at DESC");
 }
 
-export async function getFormatedTicketsModel(userId?: string) {
+export async function getFormatedTicketsModel(userId?: string, pagination?: { page: number; limit: number }, filter?: { status?: string; priority?: string }) {
   let result;
   if (userId) {
     result = await db.query(`
@@ -136,10 +136,16 @@ export async function getFormatedTicketsModel(userId?: string) {
         u_owner.id as owned_by_id,
         u_assignee.name as assignee_name,
         u_assignee.email as assignee_email,
-        u_assignee.id as assignee_id
+        u_assignee.id as assignee_id,
+        sla.name as sla_name,
+        sla.id as sla_id,
+        sla.response_time_hours as sla_response_time_hours,
+        sla.resolution_time_hours as sla_resolution_time_hours,
+        sla.description as sla_description
       FROM tickets t
       LEFT JOIN departments d ON t.department_id = d.id
       LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN sla_policies sla ON t.sla_policy_id = sla.id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
       LEFT JOIN users u_owner ON t.created_for = u_owner.id
@@ -180,7 +186,14 @@ export async function getFormatedTicketsModel(userId?: string) {
       id: row.assignee_id,
       name: row.assignee_name,
       email: row.assignee_email
-    } : null
+    } : null,
+    sla: {
+      id: row.sla_id,
+      name: row.sla_name,
+      response_time_hours: row.sla_response_time_hours,
+      resolution_time_hours: row.sla_resolution_time_hours,
+      description: row.sla_description
+    }
   }));
 
   return formatedResults;
