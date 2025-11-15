@@ -9,6 +9,9 @@ import {
 } from "../models/ticket.model";
 
 import { io as mainSocketServer} from "../index";
+import { getFormatedUsersModel, getUsersModel } from "../models/users.model";
+import { getFormatedBranchesModel } from "../models/branches.model";
+import { getFormatedDepartmentsModel } from "../models/departments.model";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -104,6 +107,27 @@ export function newSetupHandlers(io: Server) {
         data: [],
         message: "Subscribed to L3 ticket list successfully"
       });
+      const data = await getFormatedUsersModel();
+      const payload = {
+        success: true,
+        data,
+        message: "Users retrieved successfully"
+      }
+      const branchesData = await getFormatedBranchesModel();
+      const branchesPayload = {
+        success: true,
+        data: branchesData,
+        message: "Branches retrieved successfully"
+      }
+      const departmentsData = await getFormatedDepartmentsModel();
+      const departmentsPayload = {
+        success: true,
+        data: departmentsData,
+        message: "Departments retrieved successfully"
+      }
+      emitL3(io, ['users:all'], payload);
+      emitL3(io, ['branches:all'], branchesPayload);
+      emitL3(io, ['departments:all'], departmentsPayload);
     });
 
     socket.on("disconnect", () => {
@@ -613,5 +637,12 @@ export function emitUserTicketAssign(io: Server, userId: string, eventList: stri
   for (const event of eventList) {
     console.log("Emitting ticket assignment to: ", event);
     io.to(['tickets:l0', 'tickets:l1', 'tickets:l2']).emit(event, data);
+  }
+}
+
+export function emitL3(io: Server, eventList: string[], data: any) {
+  for (const event of eventList) {
+    console.log("Emitting to L3 tickets room:", event);
+    io.to('tickets:l3').emit(event, data);
   }
 }
