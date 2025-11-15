@@ -50,9 +50,9 @@ export async function createUser(req: Request, res: Response) {
 
 export async function updateUser(req: Request, res: Response) {
   const { id } = req.params;
-  const { name, email, role, departmentId } = req.body;
+  // const { name, email, role, departmentId } = req.body;
   try {
-    const result = await updateUserModel(id, name, email, role, departmentId);
+    const result = await updateUserModel({...req.body, id: req.params.id});
     if (result.rowCount === 0) {
       return res.status(404).json({ message: "User not found" });
     }
