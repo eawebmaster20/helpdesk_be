@@ -14,6 +14,7 @@ import webhooksRoutes from "./routes/webhooks.routes";
 import departmentsRoutes from "./routes/departments.routes";
 import branchesRoutes from "./routes/branches.routes";
 import usersRoutes from "./routes/users.routes";
+import slasRoutes from "./routes/sla.routes";
 import cors from "cors";
 import { db, initializeDatabase, resetDatabase } from "./db/index";
 import { sendPasswordSetupEmail, sendTestEmail } from "./utils/email";
@@ -64,6 +65,7 @@ app.use("/api/v1/webhooks", webhooksRoutes);
 app.use("/api/v1/departments", departmentsRoutes);
 app.use("/api/v1/branches", branchesRoutes);
 app.use("/api/v1/users", usersRoutes);
+app.use("/api/v1/slas", slasRoutes);
 app.get("/init-db", async (req: Request, res: Response) => {
   try {
     await initializeDatabase();
