@@ -10,21 +10,21 @@ import {
 } from "./data";
 import { FormattedTicket } from "../models/ticket.model";
 import { get } from "http";
-import { getFormattedUsersByIdModel } from "../models/users.model";
+import { getFormattedUsersByEmailModel } from "../models/users.model";
 
 // Configure Redis connection for Bull
 const emailQueue = new bull("emailQueue", {
   redis: {
-    host: process.env.REDIS_HOST || "localhost",
+    host: process.env.REDIS_HOST || "redis",
     port: parseInt(process.env.REDIS_PORT || "6379"),
-    password: process.env.REDIS_PASSWORD,
+    // password: process.env.REDIS_PASSWORD,
   },
 });
 
 // Add queue event listeners for debugging
-// emailQueue.on('ready', () => {
-//     console.log('Email queue is ready and connected to Redis');
-// });
+emailQueue.on('ready', () => {
+    console.log('Email queue is ready and connected to Redis');
+});
 emailQueue.on("active", (job) => {
   console.log(
     JSON.stringify({
@@ -46,7 +46,7 @@ emailQueue.on("error", (error) => {
       service: "email-queue",
       event_type: "queue_error",
       status: "error",
-      error: error.message,
+      error: error,
       timestamp: new Date().toISOString(),
     })
   );
@@ -124,7 +124,7 @@ export const addEmailToQueue = async (emailJob: EmailJob): Promise<boolean> => {
   }
 
   try {
-    // console.log('Adding email to queue:', emailJob.to, emailJob.subject);
+    console.log('Adding email to queue:', emailJob.to, emailJob.subject);
     await emailQueue.add(emailJob, {
       attempts: 3,
       backoff: {
@@ -208,7 +208,8 @@ export const sendEmail = async (
       console.warn(`Unknown email type: ${type}`);
   }
   try {
-    const userEmails = await getFormattedUsersByIdModel(to);
+    console.log("to:", to);
+    const userEmails = await getFormattedUsersByEmailModel(to);
     if (!userEmails) {
       console.warn("No valid user emails found for the provided IDs.");
       return;
