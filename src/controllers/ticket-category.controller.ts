@@ -12,29 +12,46 @@ export async function createTicketCategory(req: Request, res: Response) {
       `INSERT INTO categories (name, description) VALUES ($1, $2) RETURNING *`,
       [name, description]
     );
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({
+      data: result.rows[0],
+      message: 'Category created successfully',
+      status: 'success'
+    });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
 }
 
 export async function createBulkTicketCategories(req: Request, res: Response) {
-  const categories = req.body.categories;
+  const { categories } = req.body;
   if (!Array.isArray(categories) || categories.length === 0) {
     return res.status(400).json({ message: "categories array is required" });
   }
+  
   try {
     await db.query("BEGIN");
-    const insertPromises = categories.map((category: any) => {
+    
+    const createdCategories = [];
+    for (const category of categories) {
       const { name, description } = category;
-      return db.query(
+      if (!name) {
+        await db.query("ROLLBACK");
+        return res.status(400).json({ message: "name is required for all categories" });
+      }
+      
+      const result = await db.query(
         `INSERT INTO categories (name, description) VALUES ($1, $2) RETURNING *`,
         [name, description]
       );
-    });
-    const results = await Promise.all(insertPromises);
+      createdCategories.push(result.rows[0]);
+    }
+    
     await db.query("COMMIT");
-    res.status(201).json(results.map((r) => r.rows[0]));
+    res.status(201).json({
+      data: createdCategories,
+      message: `${createdCategories.length} categories created successfully`,
+      status: 'success'
+    });
   } catch (err) {
     await db.query("ROLLBACK");
     res.status(500).json({ message: "Database error", error: err });
@@ -68,11 +85,16 @@ export async function updateTicketCategory(req: Request, res: Response) {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Category not found" });
     }
-    res.json(result.rows[0]);
+    res.json({
+      data: result.rows[0],
+      message: 'Category updated successfully',
+      status: 'success'
+    });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
 };
+
 export async function deleteTicketCategory(req: Request, res: Response) {
   const { id } = req.params;
   try {
