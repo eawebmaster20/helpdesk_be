@@ -14,15 +14,38 @@ import { generateUserToken } from "../middlewares/jwt.utils";
 import { error } from "console";
 
 export async function login(req: Request, res: Response) {
+  if (req.body.username === process.env.ADMIN_USERNAME && req.body.password === process.env.SERVICE_DESK_PASSWORD) {
+    const user = await db.query(
+      "SELECT * FROM users WHERE username = $1",
+      [req.body.username]
+    );
+    if (user.rows.length === 0) {
+      return res.status(401).json({ message: "Service Desk user not found", status: 'error' });
+    }
+    const token = generateUserToken({
+      email: req.body.username,
+      id: user.rows[0].id,
+    });
+    return res.status(200).json({ 
+      message: "Login successful", 
+      data: {
+        user: user.rows[0],
+        token
+      }
+      , status: 'success'});
+  }
   try {
     const ldapUser: any = await ldapAuthenticate(req, res);
     
+ 
     if (!ldapUser || !ldapUser.dn) {
       return res.status(401).json({ message: "LDAP authentication failed", status: 'error', error: ldapUser});
     }
     
+    
     // Parse LDAP DN to get user information
-    const payload = parseLDAPDN(ldapUser.dn);
+    let payload = parseLDAPDN(ldapUser.dn);
+    payload.branch = ldapUser.physicalDeliveryOfficeName || payload.branch;
     const userEmail = ldapUser.mail || ldapUser.userPrincipalName || '';
     
     // Check if user exists in database
@@ -30,6 +53,7 @@ export async function login(req: Request, res: Response) {
       "SELECT * FROM users WHERE email = $1",
       [userEmail]
     );
+
     
     let dbUser;
     if (existingUserResult.rows.length === 0) {
@@ -70,7 +94,7 @@ export async function login(req: Request, res: Response) {
           // create new branch
           const newBranchResult = await db.query(
             `INSERT INTO branches (name) VALUES ($1) RETURNING *`,
-            [payload.branch]
+            [ldapUser.physicalDeliveryOfficeName || payload.branch]
           );
           branchId = newBranchResult.rows[0].id;
         }
@@ -78,9 +102,9 @@ export async function login(req: Request, res: Response) {
       
       // Create new user
       const newUserResult = await db.query(
-        `INSERT INTO users (name, email, role, department_id, branch_id) 
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [payload.name, userEmail, '0', departmentId, branchId]
+        `INSERT INTO users (name, email, username, role, department_id, branch_id) 
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [payload.name, userEmail, req.body.username, '0', departmentId, branchId]
       );
       
       dbUser = newUserResult.rows[0];
@@ -109,7 +133,6 @@ export async function login(req: Request, res: Response) {
       LEFT JOIN branches b ON u.branch_id = b.id
       WHERE u.id = $1
     `, [dbUser.id]);
-    
     const userWithDept = userWithDeptResult.rows[0];
     
     // Format user object with department data
@@ -156,14 +179,14 @@ export async function login(req: Request, res: Response) {
 }
 
 export async function createUser(req: Request, res: Response) {
-  const { name, email, role, departmentId } = req.body;
-  if (!name || !email || !role) {
+  const { name, username, role, departmentId } = req.body;
+  if (!name || !username || !role) {
     return res
       .status(400)
-      .json({ message: "name, email, and role are required" });
+      .json({ message: "name, username, and role are required" });
   }
   try {
-    const result = await insertUserModel(name, email, role, departmentId);
+    const result = await insertUserModel(name, username, role, departmentId);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
@@ -172,9 +195,9 @@ export async function createUser(req: Request, res: Response) {
 
 export async function updateUser(req: Request, res: Response) {
   const { id } = req.params;
-  const { name, email, role, departmentId } = req.body;
+  const { name, username, role, departmentId } = req.body;
   try {
-    const result = await updateUserModel(id, name, email, role, departmentId);
+    const result = await updateUserModel(id, name, username, role, departmentId);
     if (result.rowCount === 0) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -247,7 +270,6 @@ export async function updateADUserDepartment(req: any, res: any, next: any) {
       throw new Error("User not found");
     }
     const userDN = searchResult.searchEntries[0].distinguishedName as string;
-
     // Update department attribute
     await client.modify(userDN, [
       new Change({
