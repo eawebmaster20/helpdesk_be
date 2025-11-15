@@ -2,10 +2,12 @@
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
+  username VARCHAR(100) NOT NULL UNIQUE,
   email VARCHAR(100) NOT NULL UNIQUE,
   role VARCHAR(32),
   department_id UUID,
   branch_id UUID,
+  onboarded BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -33,6 +35,18 @@ CREATE TABLE IF NOT EXISTS categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
   description TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- SLA Policies table
+CREATE TABLE IF NOT EXISTS sla_policies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  enabled BOOLEAN DEFAULT TRUE,
+  response_time_hours INTEGER NOT NULL,
+  resolution_time_hours INTEGER NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -78,17 +92,6 @@ CREATE TABLE IF NOT EXISTS forms (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- SLA Policies table
-CREATE TABLE IF NOT EXISTS sla_policies (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(100) NOT NULL,
-  description TEXT,
-  response_time_hours INTEGER NOT NULL,
-  resolution_time_hours INTEGER NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
 -- Automations table (optional, for future use)
 CREATE TABLE IF NOT EXISTS automations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -130,6 +133,15 @@ CREATE TABLE IF NOT EXISTS ticket_approvals (
   decided_by UUID, -- userId
   decided_at TIMESTAMP,
   comment TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- env_config table
+CREATE TABLE IF NOT EXISTS env_config (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key VARCHAR(100) NOT NULL UNIQUE,
+  value TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
