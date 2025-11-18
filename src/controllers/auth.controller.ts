@@ -116,12 +116,7 @@ export async function login(req: Request, res: Response) {
     // Fetch user with department data (replace department_id with actual department object)
     const userWithDeptResult = await db.query(`
       SELECT 
-        u.id,
-        u.name,
-        u.email,
-        u.role,
-        u.created_at,
-        u.updated_at,
+        u.*,
         d.id as department_id,
         d.name as department_name,
         d.head_id as department_head_id,
@@ -140,6 +135,7 @@ export async function login(req: Request, res: Response) {
       id: userWithDept.id,
       name: userWithDept.name,
       email: userWithDept.email,
+      onboarded: userWithDept.onboarded,
       role: userWithDept.role,
       created_at: userWithDept.created_at,
       updated_at: userWithDept.updated_at,
@@ -153,7 +149,7 @@ export async function login(req: Request, res: Response) {
         name: userWithDept.branch_name,
         head_id: userWithDept.branch_head_id
       } : null,
-      ldapUser
+      // ldapUser
     };
     
     // Generate JWT token
@@ -197,7 +193,7 @@ export async function updateUser(req: Request, res: Response) {
   const { id } = req.params;
   const { name, username, role, departmentId } = req.body;
   try {
-    const result = await updateUserModel(id, name, username, role, departmentId);
+    const result = await updateUserModel(id, {...req.body});
     if (result.rowCount === 0) {
       return res.status(404).json({ message: "User not found" });
     }
