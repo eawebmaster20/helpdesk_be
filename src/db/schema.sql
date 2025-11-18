@@ -51,6 +51,14 @@ CREATE TABLE IF NOT EXISTS sla_policies (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Ticket Counter table (for generating sequential ticket numbers)
+CREATE TABLE IF NOT EXISTS ticket_counter (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  current_number INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+
 -- Tickets table
 CREATE TABLE IF NOT EXISTS tickets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -65,17 +73,20 @@ CREATE TABLE IF NOT EXISTS tickets (
   status VARCHAR(32) NOT NULL,
   priority VARCHAR(16) NOT NULL,
   sla_policy_id UUID REFERENCES sla_policies(id) ON DELETE CASCADE,
-  attachments TEXT[],
   assignee_id UUID REFERENCES users(id),
+  active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Ticket Counter table (for generating sequential ticket numbers)
-CREATE TABLE IF NOT EXISTS ticket_counter (
-  id INTEGER PRIMARY KEY DEFAULT 1,
-  current_number INTEGER NOT NULL DEFAULT 0,
-  updated_at TIMESTAMP DEFAULT NOW()
+
+-- Ticket Attachments table
+CREATE TABLE IF NOT EXISTS ticket_attachments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  uploaded_by UUID NOT NULL REFERENCES users(id),
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Insert initial counter record if it doesn't exist
