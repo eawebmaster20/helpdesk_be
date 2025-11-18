@@ -8,7 +8,7 @@ import {
   addTicketAttachment,
   assignTicket,
   transitionTicket,
-  linkTicket,
+  closeTicket,
   getTicketsByUser,
   getTicketActivities
 } from "../controllers/tickets.controller";
@@ -45,6 +45,6 @@ router.post("/:id/assign", assignTicket);
 router.post("/:id/transition", transitionTicket);
 
 // POST /tickets/:id/link
-router.post("/:id/link", linkTicket);
+router.post("/:id/close", closeTicket);
 
 export default router;
