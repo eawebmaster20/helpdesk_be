@@ -63,17 +63,70 @@ export async function insertUserModel(
   );
 }
 
+// export async function updateUserModel(
+//   id: string,
+//   name?: string,
+//   email?: string,
+//   username?: string,
+//   role?: string,
+//   password?: string,
+//   departmentId?: string,
+//   onboarded?: boolean
+// ) {
+//   return db.query(
+//     `UPDATE users SET name = COALESCE($1, name), email = COALESCE($2, email), username = COALESCE($3, username), role = COALESCE($4, role), password = COALESCE($5, password), department_id = COALESCE($6, department_id), onboarded = COALESCE($7, onboarded), updated_at = NOW() WHERE id = $8 RETURNING *`,
+//     [name, email, username, role, password, departmentId, onboarded, id]
+//   );
+// }
 export async function updateUserModel(
   id: string,
-  name?: string,
-  email?: string,
-  username?: string,
-  role?: string,
-  password?: string,
-  departmentId?: string
+  updates: {
+    name?: string;
+    email?: string;
+    username?: string;
+    role?: string;
+    password?: string;
+    departmentId?: string;
+    onboarded?: boolean;
+  }
 ) {
+  const setClauses: string[] = ['updated_at = NOW()'];
+  const values: any[] = [];
+  let paramIndex = 1;
+
+  if (updates.name !== undefined) {
+    setClauses.push(`name = $${paramIndex++}`);
+    values.push(updates.name);
+  }
+  if (updates.email !== undefined) {
+    setClauses.push(`email = $${paramIndex++}`);
+    values.push(updates.email);
+  }
+  if (updates.username !== undefined) {
+    setClauses.push(`username = $${paramIndex++}`);
+    values.push(updates.username);
+  }
+  if (updates.role !== undefined) {
+    setClauses.push(`role = $${paramIndex++}`);
+    values.push(updates.role);
+  }
+  if (updates.password !== undefined) {
+    setClauses.push(`password = $${paramIndex++}`);
+    values.push(updates.password);
+  }
+  if (updates.departmentId !== undefined) {
+    setClauses.push(`department_id = $${paramIndex++}`);
+    values.push(updates.departmentId);
+  }
+  if (updates.onboarded !== undefined) {
+    setClauses.push(`onboarded = $${paramIndex++}`);
+    values.push(updates.onboarded);
+  }
+
+  values.push(id);
+
   return db.query(
-    `UPDATE users SET name = COALESCE($1, name), email = COALESCE($2, email), username = COALESCE($3, username), role = COALESCE($4, role), password = COALESCE($5, password), department_id = COALESCE($6, department_id), updated_at = NOW() WHERE id = $7 RETURNING *`,
-    [name, email, username, role, password, departmentId, id]
+    `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+    values
   );
 }
