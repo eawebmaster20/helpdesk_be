@@ -58,8 +58,9 @@ export interface FormattedTicket {
   title: string;
   description: string;
   status: string;
+  active: boolean;
   priority: string;
-  attachments: string[];
+  attachments?: string[];
   created_at: string;
   updated_at: string;
   department: {
@@ -98,32 +99,10 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
     result = await db.query(`
       SELECT
         t.*,
-        d.name as department_name,
-        d.id as department_id,
-        c.name as category_name,
-        c.description as category_description,
-        c.id as category_id,
-        u_creator.name as created_by_name,
-        u_creator.email as created_by_email,
-        u_owner.name as owned_by_name,
-        u_owner.email as owned_by_email,
-        u_owner.id as owned_by_id,
-        u_assignee.name as assignee_name,
-        u_assignee.email as assignee_email,
-        u_assignee.id as assignee_id
-      FROM tickets t
-      LEFT JOIN departments d ON t.department_id = d.id
-      LEFT JOIN categories c ON t.category_id = c.id
-      LEFT JOIN users u_creator ON t.created_by = u_creator.id
-      LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
-      LEFT JOIN users u_owner ON t.created_for = u_owner.id
-      WHERE t.created_by = $1 or t.created_for = $1
-      ORDER BY t.created_at DESC
-    `, [userId]);
-  } else {
-    result = await db.query(`
-      SELECT
-        t.*,
+        COALESCE(
+          ARRAY_AGG(a.url) FILTER (WHERE a.url IS NOT NULL), 
+          ARRAY[]::TEXT[]
+        ) as attachments,
         d.name as department_name,
         d.id as department_id,
         c.name as category_name,
@@ -143,12 +122,60 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
         sla.resolution_time_hours as sla_resolution_time_hours,
         sla.description as sla_description
       FROM tickets t
+      LEFT JOIN ticket_attachments a ON t.id = a.ticket_id
       LEFT JOIN departments d ON t.department_id = d.id
       LEFT JOIN categories c ON t.category_id = c.id
       LEFT JOIN sla_policies sla ON t.sla_policy_id = sla.id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
       LEFT JOIN users u_owner ON t.created_for = u_owner.id
+      WHERE t.created_by = $1 or t.created_for = $1
+      GROUP BY t.id, d.id, d.name, c.id, c.name, c.description, 
+               u_creator.id, u_creator.name, u_creator.email,
+               u_owner.id, u_owner.name, u_owner.email,
+               u_assignee.id, u_assignee.name, u_assignee.email,
+               sla.id, sla.name, sla.response_time_hours, sla.resolution_time_hours, sla.description
+      ORDER BY t.created_at DESC
+    `, [userId]);
+  } else {
+    result = await db.query(`
+      SELECT
+        t.*,
+        COALESCE(
+          ARRAY_AGG(a.url) FILTER (WHERE a.url IS NOT NULL), 
+          ARRAY[]::TEXT[]
+        ) as attachments,
+        d.name as department_name,
+        d.id as department_id,
+        c.name as category_name,
+        c.description as category_description,
+        c.id as category_id,
+        u_creator.name as created_by_name,
+        u_creator.email as created_by_email,
+        u_owner.name as owned_by_name,
+        u_owner.email as owned_by_email,
+        u_owner.id as owned_by_id,
+        u_assignee.name as assignee_name,
+        u_assignee.email as assignee_email,
+        u_assignee.id as assignee_id,
+        sla.name as sla_name,
+        sla.id as sla_id,
+        sla.response_time_hours as sla_response_time_hours,
+        sla.resolution_time_hours as sla_resolution_time_hours,
+        sla.description as sla_description
+      FROM tickets t
+      LEFT JOIN ticket_attachments a ON t.id = a.ticket_id
+      LEFT JOIN departments d ON t.department_id = d.id
+      LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN sla_policies sla ON t.sla_policy_id = sla.id
+      LEFT JOIN users u_creator ON t.created_by = u_creator.id
+      LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
+      LEFT JOIN users u_owner ON t.created_for = u_owner.id
+      GROUP BY t.id, d.id, d.name, c.id, c.name, c.description, 
+               u_creator.id, u_creator.name, u_creator.email,
+               u_owner.id, u_owner.name, u_owner.email,
+               u_assignee.id, u_assignee.name, u_assignee.email,
+               sla.id, sla.name, sla.response_time_hours, sla.resolution_time_hours, sla.description
       ORDER BY t.created_at DESC
     `);
   }
@@ -159,6 +186,7 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
     title: row.title,
     description: row.description,
     status: row.status,
+    active: row.active,
     priority: row.priority,
     attachments: row.attachments,
     created_at: new Date(row.created_at).toISOString(),
@@ -195,7 +223,6 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
       description: row.sla_description
     }
   }));
-
   return formatedResults;
 }
 
@@ -203,12 +230,15 @@ export async function getFormatedTicketsIdModel(id: string) {
   const result = await db.query(`
       SELECT
         t.*,
+        COALESCE(
+          ARRAY_AGG(a.url) FILTER (WHERE a.url IS NOT NULL), 
+          ARRAY[]::TEXT[]
+        ) as attachments,
         d.name as department_name,
         d.id as department_id,
         c.name as category_name,
         c.description as category_description,
         c.id as category_id,
-        u_creator.id as created_for_id,
         u_creator.name as created_by_name,
         u_creator.email as created_by_email,
         u_owner.name as owned_by_name,
@@ -216,14 +246,26 @@ export async function getFormatedTicketsIdModel(id: string) {
         u_owner.id as owned_by_id,
         u_assignee.name as assignee_name,
         u_assignee.email as assignee_email,
-        u_assignee.id as assignee_id
+        u_assignee.id as assignee_id,
+        sla.name as sla_name,
+        sla.id as sla_id,
+        sla.response_time_hours as sla_response_time_hours,
+        sla.resolution_time_hours as sla_resolution_time_hours,
+        sla.description as sla_description
       FROM tickets t
+      LEFT JOIN ticket_attachments a ON t.id = a.ticket_id
       LEFT JOIN departments d ON t.department_id = d.id
       LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN sla_policies sla ON t.sla_policy_id = sla.id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
       LEFT JOIN users u_owner ON t.created_for = u_owner.id
       WHERE t.id = $1
+      GROUP BY t.id, d.id, d.name, c.id, c.name, c.description, 
+               u_creator.id, u_creator.name, u_creator.email,
+               u_owner.id, u_owner.name, u_owner.email,
+               u_assignee.id, u_assignee.name, u_assignee.email,
+               sla.id, sla.name, sla.response_time_hours, sla.resolution_time_hours, sla.description
       ORDER BY t.created_at DESC
     `, [id]);
 
@@ -234,6 +276,7 @@ export async function getFormatedTicketsIdModel(id: string) {
     title: row.title,
     description: row.description,
     status: row.status,
+    active: row.active,
     priority: row.priority,
     attachments: row.attachments,
     created_at: row.created_at,
@@ -270,6 +313,10 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
   const result = await db.query(`
       SELECT
         t.*,
+        COALESCE(
+          ARRAY_AGG(a.url) FILTER (WHERE a.url IS NOT NULL), 
+          ARRAY[]::TEXT[]
+        ) as attachments,
         d.name as department_name,
         d.id as department_id,
         c.name as category_name,
@@ -281,6 +328,7 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
         u_assignee.email as assignee_email,
         u_assignee.id as assignee_id
       FROM tickets t
+      LEFT JOIN ticket_attachments a ON t.id = a.ticket_id
       LEFT JOIN departments d ON t.department_id = d.id
       LEFT JOIN categories c ON t.category_id = c.id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
@@ -296,6 +344,7 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
     title: row.title,
     description: row.description,
     status: row.status,
+    active: row.active,
     priority: row.priority,
     attachments: row.attachments,
     created_at: row.created_at,
@@ -332,11 +381,10 @@ export async function createTicketModel(
   createdFor: string,
   priority: string,
   categoryId?: string,
-  attachments?: string[]
 ) {
   return db.query(
-    `INSERT INTO tickets (ticket_number, title, description, department_id, created_by, created_for, status, priority, category_id, attachments) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-    [ticketNumber, title, description, departmentId, createdBy, createdFor, "New", priority, categoryId, attachments || []]
+    `INSERT INTO tickets (ticket_number, title, description, department_id, created_by, created_for, status, priority, category_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [ticketNumber, title, description, departmentId, createdBy, createdFor, "New", priority, categoryId]
   );
 }
 
@@ -365,6 +413,13 @@ export async function updateTicketModel(
   );
 }
 
+export async function closeTicketModel(id: string) {
+  return db.query(
+    `UPDATE tickets SET status = 'Closed', active = FALSE, updated_at = NOW() WHERE id = $1`,
+    [id]
+  );
+}
+
 export async function addTicketCommentModel(
   ticketId: string,
   body: string,
@@ -379,14 +434,20 @@ export async function addTicketCommentModel(
 
 export async function addTicketAttachmentModel(
   ticketId: string,
-  filename: string,
-  url: string,
+  // filename: string,
+  urls: string[],
   uploadedBy: string
 ) {
-  return db.query(
-    `INSERT INTO ticket_attachments (ticket_id, filename, url, uploaded_by) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [ticketId, filename, url, uploadedBy]
-  );
+   const insertPromises = urls.map(url => {
+    return db.query(
+      `INSERT INTO ticket_attachments (ticket_id, url, uploaded_by) VALUES ($1, $2, $3) RETURNING *`,
+      [ticketId, url, uploadedBy]
+    );
+  });
+  const queryResults = await Promise.all(insertPromises);
+  // Combine rows from all insert queries into a single array
+  const rows = queryResults.reduce((acc: any[], res) => acc.concat(res.rows), []);
+  return rows;
 }
 
 export async function assignTicketModel(id: string, assigneeId: string) {
