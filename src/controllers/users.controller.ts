@@ -52,7 +52,7 @@ export async function updateUser(req: Request, res: Response) {
   const { id } = req.params;
   // const { name, email, role, departmentId } = req.body;
   try {
-    const result = await updateUserModel({...req.body, id: req.params.id});
+    const result = await updateUserModel(req.params.id, {...req.body});
     if (result.rowCount === 0) {
       return res.status(404).json({ message: "User not found" });
     }
