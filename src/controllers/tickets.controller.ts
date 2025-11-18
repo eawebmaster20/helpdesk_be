@@ -6,12 +6,15 @@ import {
   addTicketActivityModel,
   getTicketActivitiesModel,
   getFormatedTicketsIdModel,
+  closeTicketModel,
 } from "../models/ticket.model";
 import { Request, Response } from "express";
 import { db } from "../db";
 import { io } from "../index";
 import { emitTicketActivityUpdate, emitTicketCreatedEvent, emitTicketUpdate, emitUserTicketAssign } from "../websockets/ticket.socket";
 import { sendEmail } from "../utils/bull-email";
+import { emit } from "process";
+import { get } from "http";
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
@@ -74,6 +77,11 @@ export async function updateTicket(req: Request, res: Response) {
   }
 }
 
+export async function editTicket(req: Request, res: Response) {
+  const { id } = req.params;
+  const { title, description, status, priority, assigneeId, userId } = req.body;
+}
+
 export async function addTicketComment(req: Request, res: Response) {
   const { id } = req.params;
   const { comment, type, userId } = req.body;
@@ -92,14 +100,14 @@ export async function addTicketComment(req: Request, res: Response) {
    await addTicketActivityModel(id, type, userId, action, comment);
     const updatedActivities = await getTicketActivitiesModel(id);
     const usersToNotify = new Set<string>();
-    usersToNotify.add(`${userId}:ticket:update`);
-    usersToNotify.add(`tickets:update`);
-    if (ticket.assignee?.id) {
-      usersToNotify.add(`${ticket.assignee.id}:ticket:update`);
-    }
-    if (ticket.created_for?.id) {
-      usersToNotify.add(`${ticket.created_for.id}:ticket:update`);
-    }
+    usersToNotify.add(`ticket:activity:update`);
+    // usersToNotify.add(`tickets:update`);
+    // if (ticket.assignee?.id) {
+    //   usersToNotify.add(`${ticket.assignee.id}:ticket:update`);
+    // }
+    // if (ticket.created_for?.id) {
+    //   usersToNotify.add(`${ticket.created_for.id}:ticket:update`);
+    // }
     emitTicketActivityUpdate(io, Array.from(usersToNotify), {
       data: updatedActivities,
       message: "A new comment has been added",
@@ -113,25 +121,45 @@ export async function addTicketComment(req: Request, res: Response) {
 
 export async function addTicketAttachment(req: Request, res: Response) {
   const { id } = req.params;
-  const { filename, url, uploadedBy } = req.body;
-  if (!filename || !url || !uploadedBy) {
+  const { urls, uploadedBy } = req.body;
+  if (!urls || !uploadedBy) {
     return res
       .status(400)
-      .json({ message: "filename, url, and uploadedBy are required" });
+      .json({ message: "urls and uploadedBy are required" });
   }
   try {
+    console.log('activity added')
     const result = await addTicketAttachmentModel(
       id,
-      filename,
-      url,
+      urls,
       uploadedBy
     );
     
     // Add activity tracking
     const action = "added an attachment";
-    await addTicketActivityModel(id, 'attachment', uploadedBy, action, filename);
-    
-    res.status(201).json(result.rows[0]);
+    await addTicketActivityModel(id, 'attachment', uploadedBy, action, `Added ${urls.length} attachment(s)`);
+    const ticket = await getFormatedTicketsIdModel(id);
+    const ticketActivities = await getTicketActivitiesModel(id);
+    const usersToNotifyOnActivity = new Set<string>();
+    // usersToNotifyOnActivity.add(`ticket:activities`);
+    usersToNotifyOnActivity.add(`ticket:activity:update`);
+    if (ticket.created_for && uploadedBy !== ticket.created_for.id) {
+      usersToNotifyOnActivity.add(`${ticket.created_for.id}:ticket:activities`);
+    }
+    emitTicketActivityUpdate(io, Array.from(usersToNotifyOnActivity), {
+      data: ticketActivities,
+      message: "A ticket has been updated",
+      success: true
+    });
+    const usersToNotify = new Set<string>();
+    usersToNotify.add(`tickets:update`);
+    usersToNotify.add(`${ticket.created_by?.id}:ticket:update`);
+    emitTicketActivityUpdate(io, Array.from(usersToNotify), {
+      data: ticket,
+      message: "A ticket has been updated",
+      success: true
+    });
+    res.status(201).json(result);
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
@@ -258,29 +286,35 @@ export async function transitionTicket(req: Request, res: Response) {
   }
 }
 
-export async function linkTicket(req: Request, res: Response) {
+export async function closeTicket(req: Request, res: Response) {
   const { id } = req.params;
-  const { targetId, type } = req.body;
-  if (!targetId || !type) {
-    return res.status(400).json({ message: "targetId and type are required" });
+  const { userId, reason } = req.body;
+  if (!userId) {
+    return res.status(400).json({ message: "userId is required for activity tracking" });
   }
   try {
-    const ticketResult = await db.query(
-      "SELECT id FROM tickets WHERE id = $1",
-      [id]
-    );
-    const targetResult = await db.query(
-      "SELECT id FROM tickets WHERE id = $1",
-      [targetId]
-    );
-    if (ticketResult.rows.length === 0 || targetResult.rows.length === 0) {
-      return res.status(404).json({ message: "Ticket or target not found" });
+    const ticketResult = await getFormatedTicketsIdModel(id);
+    if (!ticketResult) {
+      return res.status(404).json({ message: "Ticket not found" });
     }
-    const result = await db.query(
-      `INSERT INTO ticket_links (ticket_id, target_id, type) VALUES ($1, $2, $3) RETURNING *`,
-      [id, targetId, type]
-    );
-    res.status(201).json({ message: "Linked", link: result.rows[0] });
+    await closeTicketModel(id);
+    // Add activity tracking
+    const action = reason? `closed the ticket with a Reason` : 'closed the ticket';
+    await addTicketActivityModel(id, 'status', userId, action, reason);
+    const updatedTicket = await getFormatedTicketsIdModel(id);
+
+    // Emit real-time event for ticket status change
+    // emitTicketUpdate(io, userId, ["ticket:statusChanged"], {
+    //   data: updatedTicket,
+    //   message: `Ticket status changed to Closed`,
+    //   timestamp: new Date().toISOString()
+    // });
+
+    res.json({ 
+      message: "Ticket closed successfully",
+      data: updatedTicket,
+      success: true
+     });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
@@ -438,7 +472,7 @@ const result = await db.query(`
 
 
 export async function createTicket(req: Request, res: Response) {
-  const { title, description, departmentId, createdBy, createdFor, priority, categoryId, attachments } = req.body;
+  const { title, description, departmentId, branchId, createdBy, createdFor, priority, categoryId } = req.body;
   if (!title || !title.trim() || !createdBy || !createdBy.trim() || !priority || !priority.trim() || !categoryId || !categoryId.trim()) {
     return res.status(400).json({
       message:
@@ -460,22 +494,21 @@ export async function createTicket(req: Request, res: Response) {
     
     // Create the ticket with the generated ticket number
     const result = await db.query(
-      `INSERT INTO tickets (ticket_number, title, description, department_id, created_by, created_for, status, priority, category_id, attachments) 
+      `INSERT INTO tickets (ticket_number, title, description, department_id, branch_id, created_by, created_for, status, priority, category_id) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [
         ticketNumber, 
         title, 
         description, 
         departmentId && departmentId.trim() !== '' ? departmentId : null, 
+        branchId && branchId.trim() !== '' ? branchId : null,
         createdBy, 
         createdFor && createdFor.trim() !== '' ? createdFor : null,
         "New", 
         priority, 
-        categoryId && categoryId.trim() !== '' ? categoryId : null, 
-        attachments || []
+        categoryId && categoryId.trim() !== '' ? categoryId : null
       ]
     );
-
     
     const ticketId = result.rows[0].id;
     
@@ -485,10 +518,9 @@ export async function createTicket(req: Request, res: Response) {
       const createdUser = await db.query("SELECT id FROM users WHERE id = $1", [createdBy]);
       await addTicketActivityModel(ticketId, 'status', createdFor, `ticket a created for ${createdUser.rows[0].name}`);
     }else {
-      await addTicketActivityModel(ticketId, 'status', createdBy, 'created the ticket');
+      await addTicketActivityModel(ticketId, 'status', createdBy, action);
     }
-    const newTicket = await getFormatedTicketsIdModel(ticketId);
-    
+    const newTicket = await getFormatedTicketsIdModel(ticketId); 
     // Emit real-time event for new ticket creation
     const usersToNotify = new Set<string>();
     const usersToEmail:string[] = []
@@ -507,7 +539,11 @@ export async function createTicket(req: Request, res: Response) {
       success: true,
       timestamp: new Date().toISOString()
     });
-    res.status(201).json(newTicket);
+    res.status(201).json({
+      message: "Ticket created successfully",
+      data: newTicket,
+      status: "success",
+    });
     const formatedTicket = await getFormatedTicketsIdModel(ticketId);
     sendEmail('ticket_created', usersToEmail, `Ticket ${ticketNumber} Created`, formatedTicket);
 
