@@ -43,10 +43,18 @@ CREATE TABLE IF NOT EXISTS categories (
 CREATE TABLE IF NOT EXISTS sla_policies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
-  description TEXT,
+  response_time_hours DECIMAL(5,2) NOT NULL,
+  resolution_time_hours DECIMAL(5,2) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Ticket Priorities table
+CREATE TABLE IF NOT EXISTS ticket_priorities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(100) NOT NULL,
   enabled BOOLEAN DEFAULT TRUE,
-  response_time_hours INTEGER NOT NULL,
-  resolution_time_hours INTEGER NOT NULL,
+  sla_policy_id UUID REFERENCES sla_policies(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
