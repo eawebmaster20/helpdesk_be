@@ -23,6 +23,7 @@ export async function createTicketCategory(req: Request, res: Response) {
 }
 
 export async function createBulkTicketCategories(req: Request, res: Response) {
+  console.log("Bulk create ticket categories called");
   const { categories } = req.body;
   if (!Array.isArray(categories) || categories.length === 0) {
     return res.status(400).json({ message: "categories array is required" });
