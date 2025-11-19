@@ -7,6 +7,7 @@ import { Server } from "socket.io";
 import authRoutes from "./routes/auth.routes";
 import ticketsRoutes from "./routes/tickets.routes";
 import ticketCategoriesRoutes from "./routes/ticket-category.routes";
+import ticketPrioritiesRoutes from "./routes/ticket-priority.routes";
 import approvalsRoutes from "./routes/approvals.routes";
 import adminRoutes from "./routes/admin.routes";
 import kbRoutes from "./routes/kb.routes";
@@ -58,6 +59,7 @@ app.get("/", (req: Request, res: Response) => {
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/tickets", ticketsRoutes);
 app.use("/api/v1/ticket-categories", ticketCategoriesRoutes);
+app.use("/api/v1/ticket-priorities", ticketPrioritiesRoutes);
 app.use("/api/v1/approvals", approvalsRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/kb", kbRoutes);
