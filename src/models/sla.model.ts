@@ -1,9 +1,9 @@
 import { db } from "../db";
 
-export async function createSLAModel(name: string, description: string, responseTimeHours: number, resolutionTimeHours: number) {
+export async function createSLAModel(name: string, responseTimeHours: number, resolutionTimeHours: number) {
   const result = await db.query(
-    `INSERT INTO sla_policies (name, description, response_time_hours, resolution_time_hours) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [name, description, responseTimeHours, resolutionTimeHours]
+    `INSERT INTO sla_policies (name, response_time_hours, resolution_time_hours) VALUES ($1, $2, $3) RETURNING *`,
+    [name, responseTimeHours, resolutionTimeHours]
   );
   return result.rows[0];
 }
