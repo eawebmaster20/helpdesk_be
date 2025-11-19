@@ -4,8 +4,8 @@ import { SLAPolicy } from "../types/sla";
 
 // create sla policy
 export async function createSLAPolicy(req: Request, res: Response) {
-  const { name, description, responseTimeHours, resolutionTimeHours } = req.body;
-  const result = await createSLAModel(name, description, responseTimeHours, resolutionTimeHours);
+  const { name, responseTimeHours, resolutionTimeHours } = req.body;
+  const result = await createSLAModel(name, responseTimeHours, resolutionTimeHours);
   res.json({
       data: result,
       message: 'SLA Policy created successfully',
