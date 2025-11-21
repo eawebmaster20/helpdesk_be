@@ -1,6 +1,7 @@
-import { createSLAModel, updateSLAModel, getSLAPolicyByIdModel, deleteSLAPolicyByIdModel, getAllSLAPoliciesModel } from "../models/sla.model";
+import { createSLAModel, updateSLAModel, getSLAPolicyByIdModel, deleteSLAPolicyByIdModel, getAllSLAPoliciesModel, createBulkSLAModel } from "../models/sla.model";
 import { Request, Response } from "express";
 import { SLAPolicy } from "../types/sla";
+// import { getSLAComplianceByTicketIdModel } from "../models/ticket.model";
 
 // create sla policy
 export async function createSLAPolicy(req: Request, res: Response) {
@@ -13,6 +14,20 @@ export async function createSLAPolicy(req: Request, res: Response) {
   });
 }
 
+export async function createBulkSLApolicies(req: Request, res: Response) {
+  const { slaPolicies } = req.body;
+
+  try {
+    const result = await createBulkSLAModel(slaPolicies);
+    res.json({
+      data: result,
+      message: 'SLA Policies created successfully',
+      status: 'success'
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Database error", error });
+  }
+}
 
 // update sla policy
 export async function updateSLAPolicy(req: Request, res: Response){
@@ -67,3 +82,12 @@ export async function deleteSLAPolicyById(req: Request, res: Response) {
       status: 'success'
   });
 }
+
+// export async function testFunction(req: Request, res: Response) {
+//   const result = await getSLAComplianceByTicketIdModel(req.params.ticketId, req.params.priorityId);
+//   res.json({
+//       data: result.rows,
+//       message: 'SLA Compliance retrieved successfully',
+//       status: 'success'
+//   });
+// }
