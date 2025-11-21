@@ -60,6 +60,12 @@ export function newSetupHandlers(io: Server) {
     socket.on("user_l1", async (callback) => {
       socket.join(`tickets:l1`);
       console.log(`User ${socket.userEmail} joined room tickets:l1`);
+      const myAssignedTickets = await getFormatedL2TicketsModel(socket.userId!);
+      io.to(`${socket.userId}:ticket:assign`).emit(socket.userId!, {
+        success: true,
+        data: myAssignedTickets,
+        message: "Your assigned tickets have been retrieved successfully"
+      });
       const tickets = await getFormatedTicketsModel();
       callback({
         success: true,
@@ -645,4 +651,14 @@ export function emitL3(io: Server, eventList: string[], data: any) {
     console.log("Emitting to L3 tickets room:", event);
     io.to('tickets:l3').emit(event, data);
   }
+}
+
+export async function pushUserListUpdateToAdminDashboard(){
+  const data = await getFormatedUsersModel();
+  const allUsers = {
+    success: true,
+    data,
+    message: "Users retrieved successfully"
+  };
+  emitL3(mainSocketServer, ['users:all'], allUsers);
 }
