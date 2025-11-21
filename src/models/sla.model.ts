@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { FormattedTicket } from "./ticket.model";
 
 export async function createSLAModel(name: string, responseTimeHours: number, resolutionTimeHours: number) {
   const result = await db.query(
@@ -7,6 +8,40 @@ export async function createSLAModel(name: string, responseTimeHours: number, re
   );
   return result.rows[0];
 }
+
+export async function createBulkSLAModel(policies: { name: string; responseTimeHours: number; resolutionTimeHours: number; }[]) {
+  
+  if (!Array.isArray(policies) || policies.length === 0) {
+    throw new Error("policies array is required");
+  }
+  
+  try {
+    await db.query("BEGIN");
+    
+    const createdPolicies = [];
+    for (const policy of policies) {
+      const { name, resolutionTimeHours, responseTimeHours } = policy;
+      if (!name) {
+        await db.query("ROLLBACK");
+        throw new Error("name is required for all policies");
+      }
+      
+      const result = await db.query(
+        `INSERT INTO sla_policies (name, response_time_hours, resolution_time_hours) VALUES ($1, $2, $3) RETURNING *`,
+        [name, responseTimeHours, resolutionTimeHours]
+      );
+      createdPolicies.push(result.rows[0]);
+    }
+    
+    await db.query("COMMIT");
+    return createdPolicies;
+  } catch (err) {
+    await db.query("ROLLBACK");
+    throw new Error("Database error");
+  }
+}
+
+
 
 export async function applySLAPolicyToTicket(ticketId: string, slaPolicyId: string): Promise<void> {
   await db.query(
@@ -75,4 +110,42 @@ export async function getTicketSLABreachTimes(ticketId: string) {
   `, [ticketId]);
   
   return result.rows[0];
+}
+
+export async function addSLACompliance(ticket: FormattedTicket): Promise<void> {
+  // Only create SLA compliance record if ticket has SLA policy
+  if (!process.env.ACTIVATE_SLA) {
+    return;
+  }
+  
+  try {
+    const responseMet = await is_response_met(ticket);
+    const resolutionMet = await is_resolution_met(ticket);
+    await db.query(`
+    INSERT INTO sla_compliance (ticket_id, sla_policy_id, responded_at, resolved_at, response_met, resolution_met, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, NOW())
+  `, [ticket.id, ticket.sla!.id, null, null, responseMet, resolutionMet]);
+  } catch (error) {
+    console.error('Error adding SLA compliance record:', error);
+    throw error;
+  }
+  return;
+}
+
+ async function is_response_met(ticket: FormattedTicket): Promise<boolean> {
+  if (ticket.status === 'closed' || ticket.status === 'resolved') {
+    return true;
+  }
+  const responseTimeInMinutes = ticket.sla!.response_time_hours * 60;
+  const timeSinceCreated = Date.now() - new Date(ticket.created_at).getTime();
+  return timeSinceCreated <= responseTimeInMinutes * 60 * 1000;
+}
+
+  async function is_resolution_met(ticket: FormattedTicket): Promise<boolean> {
+  if (ticket.status === 'closed' || ticket.status === 'resolved') {
+    return true;
+  }
+  const resolutionTimeInMinutes = ticket.sla!.resolution_time_hours * 60;
+  const timeSinceCreated = Date.now() - new Date(ticket.created_at).getTime();
+  return timeSinceCreated <= resolutionTimeInMinutes * 60 * 1000;
 }
