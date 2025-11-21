@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import {
+  getFormatedUsersModel,
   getUsersModel,
   insertUserModel,
   updateUserModel,
@@ -12,6 +13,7 @@ import { db } from "../db";
 import { parseLDAPDN } from "../utils/ldap";
 import { generateUserToken } from "../middlewares/jwt.utils";
 import { error } from "console";
+import { pushUserListUpdateToAdminDashboard } from "../websockets/ticket.socket";
 
 export async function login(req: Request, res: Response) {
   if (req.body.username === process.env.ADMIN_USERNAME && req.body.password === process.env.SERVICE_DESK_PASSWORD) {
@@ -106,6 +108,7 @@ export async function login(req: Request, res: Response) {
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [payload.name, userEmail, req.body.username, '0', departmentId, branchId]
       );
+      await pushUserListUpdateToAdminDashboard()
       
       dbUser = newUserResult.rows[0];
     } else {
