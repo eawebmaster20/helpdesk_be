@@ -79,10 +79,23 @@ CREATE TABLE IF NOT EXISTS tickets (
   created_for UUID REFERENCES users(id),
   category_id UUID REFERENCES categories(id),
   status VARCHAR(32) NOT NULL,
-  priority VARCHAR(16) NOT NULL,
-  sla_policy_id UUID REFERENCES sla_policies(id) ON DELETE CASCADE,
+  priority_id UUID REFERENCES ticket_priorities(id),
+  -- sla_policy_id UUID REFERENCES sla_policies(id) ON DELETE CASCADE,
   assignee_id UUID REFERENCES users(id),
   active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- SLA compliance tracking table
+CREATE TABLE IF NOT EXISTS sla_compliance (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+  sla_policy_id UUID NOT NULL REFERENCES sla_policies(id) ON DELETE CASCADE,
+  responded_at TIMESTAMP,
+  resolved_at TIMESTAMP,
+  response_met BOOLEAN,
+  resolution_met BOOLEAN,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -102,14 +115,14 @@ INSERT INTO ticket_counter (id, current_number)
 SELECT 1, 0 
 WHERE NOT EXISTS (SELECT 1 FROM ticket_counter WHERE id = 1);
 
--- Forms table
-CREATE TABLE IF NOT EXISTS forms (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(100) NOT NULL,
-  schema JSONB NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
+-- -- Forms table
+-- CREATE TABLE IF NOT EXISTS forms (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   name VARCHAR(100) NOT NULL,
+--   schema JSONB NOT NULL,
+--   created_at TIMESTAMP DEFAULT NOW(),
+--   updated_at TIMESTAMP DEFAULT NOW()
+-- );
 
 -- Automations table (optional, for future use)
 CREATE TABLE IF NOT EXISTS automations (
@@ -143,18 +156,18 @@ CREATE TABLE IF NOT EXISTS ticket_activities (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Ticket Approvals table
-CREATE TABLE IF NOT EXISTS ticket_approvals (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
-  step VARCHAR(32) NOT NULL, -- 'department_head' or 'hr'
-  status VARCHAR(16) NOT NULL DEFAULT 'Pending', -- 'Pending', 'Approved', 'Rejected'
-  decided_by UUID, -- userId
-  decided_at TIMESTAMP,
-  comment TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
+-- -- Ticket Approvals table
+-- CREATE TABLE IF NOT EXISTS ticket_approvals (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   ticket_id UUID NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+--   step VARCHAR(32) NOT NULL, -- 'department_head' or 'hr'
+--   status VARCHAR(16) NOT NULL DEFAULT 'Pending', -- 'Pending', 'Approved', 'Rejected'
+--   decided_by UUID, -- userId
+--   decided_at TIMESTAMP,
+--   comment TEXT,
+--   created_at TIMESTAMP DEFAULT NOW(),
+--   updated_at TIMESTAMP DEFAULT NOW()
+-- );
 
 -- env_config table
 CREATE TABLE IF NOT EXISTS env_config (
