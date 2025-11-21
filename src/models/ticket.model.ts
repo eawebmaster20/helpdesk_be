@@ -37,7 +37,7 @@ export interface Ticket {
     | "In Progress"
     | "Resolved"
     | "Closed";
-  priority: "Low" | "Medium" | "High" | "Critical";
+  priority: string;
   assigneeId?: string;
   approvals: TicketApproval[];
   createdAt: Date;
@@ -59,7 +59,11 @@ export interface FormattedTicket {
   description: string;
   status: string;
   active: boolean;
-  priority: string;
+  priority: {
+    id: string;
+    name: string;
+    enabled: boolean;
+  }|null;
   attachments?: string[];
   created_at: string;
   updated_at: string;
@@ -86,6 +90,12 @@ export interface FormattedTicket {
     id: string;
     name: string;
     email: string;
+  } | null;
+  sla?: {
+    id: string;
+    name: string;
+    response_time_hours: number;
+    resolution_time_hours: number;
   } | null;
 }
 
@@ -116,16 +126,19 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
         u_assignee.name as assignee_name,
         u_assignee.email as assignee_email,
         u_assignee.id as assignee_id,
-        sla.name as sla_name,
+        p.name as priority_name,
+        p.id as priority_id,
+        p.enabled as priority_enabled,
         sla.id as sla_id,
+        sla.name as sla_name,
         sla.response_time_hours as sla_response_time_hours,
-        sla.resolution_time_hours as sla_resolution_time_hours,
-        sla.description as sla_description
+        sla.resolution_time_hours as sla_resolution_time_hours
       FROM tickets t
       LEFT JOIN ticket_attachments a ON t.id = a.ticket_id
       LEFT JOIN departments d ON t.department_id = d.id
       LEFT JOIN categories c ON t.category_id = c.id
-      LEFT JOIN sla_policies sla ON t.sla_policy_id = sla.id
+      LEFT JOIN ticket_priorities p ON t.priority_id = p.id
+      LEFT JOIN sla_policies sla ON p.sla_policy_id = sla.id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
       LEFT JOIN users u_owner ON t.created_for = u_owner.id
@@ -134,7 +147,8 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
                u_creator.id, u_creator.name, u_creator.email,
                u_owner.id, u_owner.name, u_owner.email,
                u_assignee.id, u_assignee.name, u_assignee.email,
-               sla.id, sla.name, sla.response_time_hours, sla.resolution_time_hours, sla.description
+               p.id, p.name, p.enabled,
+               sla.id, sla.name, sla.response_time_hours, sla.resolution_time_hours
       ORDER BY t.created_at DESC
     `, [userId]);
   } else {
@@ -158,16 +172,19 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
         u_assignee.name as assignee_name,
         u_assignee.email as assignee_email,
         u_assignee.id as assignee_id,
-        sla.name as sla_name,
+        p.name as priority_name,
+        p.id as priority_id,
+        p.enabled as priority_enabled,
         sla.id as sla_id,
+        sla.name as sla_name,
         sla.response_time_hours as sla_response_time_hours,
-        sla.resolution_time_hours as sla_resolution_time_hours,
-        sla.description as sla_description
+        sla.resolution_time_hours as sla_resolution_time_hours
       FROM tickets t
       LEFT JOIN ticket_attachments a ON t.id = a.ticket_id
       LEFT JOIN departments d ON t.department_id = d.id
       LEFT JOIN categories c ON t.category_id = c.id
-      LEFT JOIN sla_policies sla ON t.sla_policy_id = sla.id
+      LEFT JOIN ticket_priorities p ON t.priority_id = p.id
+      LEFT JOIN sla_policies sla ON p.sla_policy_id = sla.id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
       LEFT JOIN users u_owner ON t.created_for = u_owner.id
@@ -175,7 +192,8 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
                u_creator.id, u_creator.name, u_creator.email,
                u_owner.id, u_owner.name, u_owner.email,
                u_assignee.id, u_assignee.name, u_assignee.email,
-               sla.id, sla.name, sla.response_time_hours, sla.resolution_time_hours, sla.description
+               p.id, p.name, p.enabled,
+               sla.id, sla.name, sla.response_time_hours, sla.resolution_time_hours
       ORDER BY t.created_at DESC
     `);
   }
@@ -187,7 +205,11 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
     description: row.description,
     status: row.status,
     active: row.active,
-    priority: row.priority,
+    priority: row.priority_id ? {
+      id: row.priority_id,
+      name: row.priority_name,
+      enabled: row.priority_enabled
+    } : null,
     attachments: row.attachments,
     created_at: new Date(row.created_at).toISOString(),
     updated_at: new Date(row.updated_at).toISOString(),
@@ -215,18 +237,17 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
       name: row.assignee_name,
       email: row.assignee_email
     } : null,
-    sla: {
+    sla: row.sla_id ? {
       id: row.sla_id,
       name: row.sla_name,
       response_time_hours: row.sla_response_time_hours,
-      resolution_time_hours: row.sla_resolution_time_hours,
-      description: row.sla_description
-    }
+      resolution_time_hours: row.sla_resolution_time_hours
+    } : null
   }));
   return formatedResults;
 }
 
-export async function getFormatedTicketsIdModel(id: string) {
+export async function getFormatedTicketsIdModel(id: string): Promise<FormattedTicket> {
   const result = await db.query(`
       SELECT
         t.*,
@@ -247,28 +268,50 @@ export async function getFormatedTicketsIdModel(id: string) {
         u_assignee.name as assignee_name,
         u_assignee.email as assignee_email,
         u_assignee.id as assignee_id,
-        sla.name as sla_name,
+        p.name as priority_name,
+        p.id as priority_id,
+        p.enabled as priority_enabled,
+        sc.id as sla_compliance_id,
+        sc.responded_at as sla_responded_at,
+        sc.resolved_at as sla_resolved_at,
+        sc.resolution_met as sla_resolution_met,
+        sc.response_met as sla_response_met,
+        ta_escalation.created_at as escalated_time,
+        u_escalator.id as escalated_by_id,
+        u_escalator.name as escalated_by_name,
+        u_escalator.email as escalated_by_email,
         sla.id as sla_id,
+        sla.name as sla_name,
         sla.response_time_hours as sla_response_time_hours,
-        sla.resolution_time_hours as sla_resolution_time_hours,
-        sla.description as sla_description
+        sla.resolution_time_hours as sla_resolution_time_hours
       FROM tickets t
       LEFT JOIN ticket_attachments a ON t.id = a.ticket_id
       LEFT JOIN departments d ON t.department_id = d.id
       LEFT JOIN categories c ON t.category_id = c.id
-      LEFT JOIN sla_policies sla ON t.sla_policy_id = sla.id
+      LEFT JOIN ticket_priorities p ON t.priority_id = p.id
+      LEFT JOIN sla_policies sla ON p.sla_policy_id = sla.id
+      LEFT JOIN sla_compliance sc ON t.id = sc.ticket_id AND p.sla_policy_id = sc.sla_policy_id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
       LEFT JOIN users u_owner ON t.created_for = u_owner.id
+      LEFT JOIN ticket_activities ta_escalation ON t.id = ta_escalation.ticket_id 
+        AND ta_escalation.type = 'assignment' 
+        AND ta_escalation.created_at = (
+          SELECT MIN(created_at) FROM ticket_activities 
+          WHERE ticket_id = t.id AND type = 'assignment'
+        )
+      LEFT JOIN users u_escalator ON ta_escalation.user_id = u_escalator.id
       WHERE t.id = $1
       GROUP BY t.id, d.id, d.name, c.id, c.name, c.description, 
                u_creator.id, u_creator.name, u_creator.email,
                u_owner.id, u_owner.name, u_owner.email,
                u_assignee.id, u_assignee.name, u_assignee.email,
-               sla.id, sla.name, sla.response_time_hours, sla.resolution_time_hours, sla.description
+               p.id, p.name, p.enabled,
+               sc.id, sc.responded_at, sc.resolved_at, sc.response_met, sc.resolution_met,
+               ta_escalation.created_at, u_escalator.id, u_escalator.name, u_escalator.email,
+               sla.id, sla.name, sla.response_time_hours, sla.resolution_time_hours
       ORDER BY t.created_at DESC
     `, [id]);
-
 
     const formatedResults = result.rows.map((row) => ({
     id: row.id,
@@ -277,7 +320,17 @@ export async function getFormatedTicketsIdModel(id: string) {
     description: row.description,
     status: row.status,
     active: row.active,
-    priority: row.priority,
+    escalated_time: row.escalated_time,
+    escalated_by: row.escalated_by_id ? {
+      id: row.escalated_by_id,
+      name: row.escalated_by_name,
+      email: row.escalated_by_email
+    } : null,
+    priority: row.priority_id ? {
+      id: row.priority_id,
+      name: row.priority_name,
+      enabled: row.priority_enabled
+    } : null,
     attachments: row.attachments,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -304,6 +357,19 @@ export async function getFormatedTicketsIdModel(id: string) {
       id: row.assignee_id,
       name: row.assignee_name,
       email: row.assignee_email
+    } : null,
+    sla_compliance: row.sla_compliance_id ? {
+      id: row.sla_compliance_id,
+      responded_at: row.sla_responded_at,
+      resolved_at: row.sla_resolved_at,
+      response_met: row.sla_response_met,
+      resolution_met: row.sla_resolution_met
+    } : null,
+    sla: row.sla_id ? {
+      id: row.sla_id,
+      name: row.sla_name,
+      response_time_hours: row.sla_response_time_hours,
+      resolution_time_hours: row.sla_resolution_time_hours
     } : null
   }));
     return formatedResults[0];
@@ -317,8 +383,8 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
           ARRAY_AGG(a.url) FILTER (WHERE a.url IS NOT NULL), 
           ARRAY[]::TEXT[]
         ) as attachments,
-        d.name as department_name,
-        d.id as department_id,
+        b.name as branch_name,
+        b.id as branch_id,
         c.name as category_name,
         c.description as category_description,
         c.id as category_id,
@@ -326,18 +392,43 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
         u_creator.email as created_by_email,
         u_assignee.name as assignee_name,
         u_assignee.email as assignee_email,
-        u_assignee.id as assignee_id
+        u_assignee.id as assignee_id,
+        p.name as priority_name,
+        p.id as priority_id,
+        p.enabled as priority_enabled,
+        sc.id as sla_compliance_id,
+        sc.responded_at as sla_responded_at,
+        sc.resolved_at as sla_resolved_at,
+        sc.resolution_met as sla_resolution_met,
+        sc.response_met as sla_response_met,
+        ta_escalation.created_at as escalated_time,
+        u_escalator.id as escalated_by_id,
+        u_escalator.name as escalated_by_name,
+        u_escalator.email as escalated_by_email
       FROM tickets t
       LEFT JOIN ticket_attachments a ON t.id = a.ticket_id
-      LEFT JOIN departments d ON t.department_id = d.id
+      LEFT JOIN branches b ON t.branch_id = b.id
       LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN ticket_priorities p ON t.priority_id = p.id
+      LEFT JOIN sla_compliance sc ON t.id = sc.ticket_id AND p.sla_policy_id = sc.sla_policy_id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
+      LEFT JOIN ticket_activities ta_escalation ON t.id = ta_escalation.ticket_id 
+        AND ta_escalation.type = 'assignment' 
+        AND ta_escalation.created_at = (
+          SELECT MIN(created_at) FROM ticket_activities 
+          WHERE ticket_id = t.id AND type = 'assignment'
+        )
+      LEFT JOIN users u_escalator ON ta_escalation.user_id = u_escalator.id
       WHERE t.assignee_id = $1
+      GROUP BY t.id, b.id, b.name, c.id, c.name, c.description,
+               u_creator.id, u_creator.name, u_creator.email,
+               u_assignee.id, u_assignee.name, u_assignee.email,
+               p.id, p.name, p.enabled,
+               sc.id, sc.responded_at, sc.resolved_at, sc.response_met, sc.resolution_met,
+               ta_escalation.created_at, u_escalator.id, u_escalator.name, u_escalator.email
       ORDER BY t.created_at DESC
     `, [assigneeId]);
-
-
     const formatedResults = result.rows.map((row) => ({
     id: row.id,
     ticket_number: row.ticket_number,
@@ -345,7 +436,17 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
     description: row.description,
     status: row.status,
     active: row.active,
-    priority: row.priority,
+    escalated_time: row.escalated_time,
+    escalated_by: row.escalated_by_id ? {
+      id: row.escalated_by_id,
+      name: row.escalated_by_name,
+      email: row.escalated_by_email
+    } : null,
+    priority: row.priority_id ? {
+      id: row.priority_id,
+      name: row.priority_name,
+      enabled: row.priority_enabled
+    } : null,
     attachments: row.attachments,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -367,10 +468,32 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
       id: row.assignee_id,
       name: row.assignee_name,
       email: row.assignee_email
+    } : null,
+    sla_compliance: row.sla_compliance_id ? {
+      id: row.sla_compliance_id,
+      responded_at: row.sla_responded_at,
+      resolved_at: row.sla_resolved_at,
+      response_met: row.sla_response_met,
+      resolution_met: row.sla_resolution_met
+    } : null,
+    branch: row.branch_id ? {
+      id: row.branch_id,
+      name: row.branch_name
     } : null
   }));
     return formatedResults;
 }
+
+// export async function getSLAComplianceByTicketIdModel(ticketId: string, priorityId: string, slaId?: string) {
+//   const ticket = await db.query("SELECT * FROM tickets WHERE priority_id = $1 AND id = $2", [priorityId, ticketId]);
+//   const priority = await db.query("SELECT * FROM ticket_priorities WHERE id = $1 ", [ ticket.rows[0].priority_id ]);
+//   const compliance = await db.query("SELECT * FROM sla_compliance WHERE ticket_id = $1 AND sla_policy_id = $2", [ ticketId, priority.rows[0].sla_policy_id ]);
+//         return {rows: [{
+//           ticket: ticket.rows[0],
+//           priority: priority.rows[0],
+//           compliance: compliance.rows[0]
+//         }]};
+// }
 
 export async function createTicketModel(
   ticketNumber: string,
@@ -405,7 +528,7 @@ export async function updateTicketModel(
       title = COALESCE($1, title),
       description = COALESCE($2, description),
       status = COALESCE($3, status),
-      priority = COALESCE($4, priority),
+      priority_id = COALESCE($4, priority_id),
       assignee_id = COALESCE($5, assignee_id),
       updated_at = NOW()
     WHERE id = $6 RETURNING *`,
