@@ -17,7 +17,7 @@ export const getTicketCreatedHtmlContent = (ticket: FormattedTicket) => `
                     <!-- Content -->
                     <tr>
                         <td style="padding: 40px 30px;">
-                            <span style="display: inline-block; background-color: #f43228; color: #ffffff; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 20px;">Ticket Update</span>
+                            <span style="display: inline-block; background-color: #f43228; color: #ffffff; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 20px;">Ticket Created</span>
 
                             <h1 style="color: #1a1a1a; font-size: 22px; margin: 20px 0 16px 0; font-weight: 600;">Your Support Ticket Has Been Created Successfully</h1>
 
@@ -32,7 +32,7 @@ export const getTicketCreatedHtmlContent = (ticket: FormattedTicket) => `
                                         <p style="margin: 10px 0 0 0; color: #2d3748; font-size: 14px; line-height: 1.8;">
                                             • <strong>Ticket ID:</strong> #${ticket.ticket_number}<br>
                                             • <strong>Category:</strong> ${ticket.category?.name}<br>
-                                            • <strong>Priority:</strong> ${ticket.priority}<br>
+                                            • <strong>Priority:</strong> ${ticket.priority?.name}<br>
                                             • <strong>Status:</strong> ${ticket.status}<br>
                                             • <strong>Last Updated:</strong> ${ticket.updated_at.toLocaleString()}
                                         </p>
@@ -88,7 +88,7 @@ export const getTicketCreatedHtmlContent = (ticket: FormattedTicket) => `
                             <p style="color: #718096; font-size: 13px; line-height: 1.6; margin: 0 0 15px 0;">
                                 <strong style="color: #1a1a1a;">IT Department</strong><br>
                                 Email: itsupport@starassurance.com<br>
-                                Phone: (555) 123-4567<br>
+                                Phone extension: 5003 | 5005 | 5006<br>
                                 <!-- Hours: Monday - Friday, 8:00 AM - 5:00 PM GMT -->
                             </p>
 
@@ -176,7 +176,7 @@ export const getTicketUpdatedHtmlContent = (ticket: FormattedTicket) => `
                             <p style="color: #718096; font-size: 13px; line-height: 1.6; margin: 0 0 15px 0;">
                                 <strong style="color: #1a1a1a;">IT Support Department</strong><br>
                                 Email: itsupport@starassurance.com<br>
-                                Phone: (555) 123-4567<br>
+                                Phone extension: 5003 | 5005 | 5006<br>
                                 <!-- Hours: Monday - Friday, 8:00 AM - 6:00 PM EST -->
                             </p>
 
