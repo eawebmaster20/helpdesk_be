@@ -13,13 +13,14 @@ import { db } from "../db";
 import { io } from "../index";
 import { emitTicketActivityUpdate, emitTicketCreatedEvent, emitTicketUpdate, emitUserTicketAssign } from "../websockets/ticket.socket";
 import { sendEmail } from "../utils/bull-email";
-import { emit } from "process";
-import { get } from "http";
+import { applySLAPolicyToTicket } from "./sla.controller";
+import { addSLACompliance } from "../models/sla.model";
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
-  const { title, userId, description, status, priority, assigneeId } = req.body;
+  const { title, userId, description, status, priority, priorityName, assigneeId } = req.body;
   try {
+    const unUpdatedTicket = await getFormatedTicketsIdModel(id);
     const result = await updateTicketModel(
       id,
       title,
@@ -35,17 +36,17 @@ export async function updateTicket(req: Request, res: Response) {
     const updatedTicket = await getFormatedTicketsIdModel(id);
     let action = ""
     // Determine what was updated for activity tracking
-    if (title !== updatedTicket.title) {
+    if (title && title !== updatedTicket.title) {
       action += `changed title from "${title}" to "${updatedTicket.title}". `;
     }
-    if (description !== updatedTicket.description) {
+    if (description && description !== updatedTicket.description) {
       action += `changed description from "${description}" to "${updatedTicket.description}". `;
     }
-    if (status !== updatedTicket.status) {
-      action += `changed status from "${status}" to "${updatedTicket.status}". `;
+    if (status && status !== updatedTicket.status) {
+      action += `changed status from "${unUpdatedTicket.status}" to "${updatedTicket.status}". `;
     }
-    if (priority !== updatedTicket.priority) {
-      action += `changed priority from "${priority}" to "${updatedTicket.priority}". `;
+    if (priority && priority !== updatedTicket.priority) {
+      action += `changed priority from "${unUpdatedTicket.priority?.name}" to "${updatedTicket.priority?.name}". `;
     }
     // if (assigneeId !== ticketResult.assignee?.id) {
     //   action += `Reassigned assignee from "${ticketResult.assignee?.name}" to "${assigneeId}". `;
@@ -60,7 +61,7 @@ export async function updateTicket(req: Request, res: Response) {
     }
     const usersToEmail = [
       updatedTicket.created_by?.email,
-      updatedTicket.assignee?.email,
+      // updatedTicket.assignee?.email,
       updatedTicket.created_for?.email
     ].filter(Boolean) as string[];
 
@@ -71,7 +72,9 @@ export async function updateTicket(req: Request, res: Response) {
       message: "A ticket has been updated",
       success: true
     });
-    sendEmail('status_update', usersToEmail, `There is an update on your ticket ${updatedTicket.ticket_number}`, updatedTicket);
+    if (updatedTicket.status === 'Resolved') {
+      sendEmail('status_update', usersToEmail, `There is an update on your ticket ${updatedTicket.ticket_number}`, updatedTicket);
+    }
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
@@ -218,8 +221,8 @@ export async function assignTicket(req: Request, res: Response) {
     });
     
     const usersToEmail = [
-      // ticket.assignee?.id,
-      ticket.created_by?.id
+      ticket.assignee?.id,
+      // ticket.created_by?.id
     ].filter(Boolean) as string[];
     sendEmail('ticket_assigned', usersToEmail, `Ticket ${ticket.ticket_number} has been assigned`, ticket);
     res.json({ message: "Assigned", data:[] });
@@ -493,8 +496,9 @@ export async function createTicket(req: Request, res: Response) {
     const ticketNumber = `TKT-${counterResult.rows[0].current_number}`;
     
     // Create the ticket with the generated ticket number
+    console.log('creating ticket with number:', ticketNumber);
     const result = await db.query(
-      `INSERT INTO tickets (ticket_number, title, description, department_id, branch_id, created_by, created_for, status, priority, category_id) 
+      `INSERT INTO tickets (ticket_number, title, description, department_id, branch_id, created_by, created_for, status, priority_id, category_id) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [
         ticketNumber, 
@@ -511,6 +515,7 @@ export async function createTicket(req: Request, res: Response) {
     );
     
     const ticketId = result.rows[0].id;
+    console.log('ticket created with id:', ticketId); 
     
     // Add initial activity tracking for ticket creation
     const action = "created the ticket";
@@ -544,8 +549,9 @@ export async function createTicket(req: Request, res: Response) {
       data: newTicket,
       status: "success",
     });
-    const formatedTicket = await getFormatedTicketsIdModel(ticketId);
-    sendEmail('ticket_created', usersToEmail, `Ticket ${ticketNumber} Created`, formatedTicket);
+    await addSLACompliance(newTicket);
+    // const formatedTicket = await getFormatedTicketsIdModel(newTicket.id);
+    sendEmail('ticket_created', usersToEmail, `Ticket ${ticketNumber} Created`, newTicket);
 
 
   } catch (err) {
