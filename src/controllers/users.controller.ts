@@ -5,6 +5,7 @@ import {
   insertUserModel,
   updateUserModel,
 } from "../models/users.model";
+import { pushUserListUpdateToAdminDashboard } from "../websockets/ticket.socket";
 
 export async function getUsers(req: Request, res: Response) {
   try {
@@ -19,10 +20,25 @@ export async function getUsers(req: Request, res: Response) {
   }
 }
 
-export async function getL2Users(req: Request, res: Response) {
+export async function getUserGroup(req: Request, res: Response) {
   const { id } = req.params;
   try {
-    const result = await getUserGroupModel(id);
+    const result = await getUserGroupModel([id]);
+    res.json({
+      data: result.rows,
+      message: 'User group retrieved successfully',
+      status: 'success'
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Database error", error: err });
+  }
+}
+
+export async function getAgents(req: Request, res: Response) {
+  const { roles } = req.body;
+  console.log("Roles received:", roles);
+  try {
+    const result = await getUserGroupModel(roles);
     res.json({
       data: result.rows,
       message: 'Users retrieved successfully',
@@ -56,7 +72,8 @@ export async function updateUser(req: Request, res: Response) {
     if (result.rowCount === 0) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.json(result.rows[0]);
+    await pushUserListUpdateToAdminDashboard()
+    res.status(200).json('ok');
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
