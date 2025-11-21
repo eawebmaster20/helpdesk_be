@@ -3,7 +3,8 @@ import {
   getUsers,
   createUser,
   updateUser,
-  getL2Users,
+  getAgents,
+  getUserGroup,
 } from "../controllers/users.controller";
 
 const router = Router();
@@ -12,7 +13,10 @@ const router = Router();
 router.get("/", getUsers);
 
 // GET USER GROUP /users/level/:id
-router.get("/level/:id", getL2Users);
+router.get("/level/:id", getUserGroup);
+
+
+router.post("/agents", getAgents);
 
 // POST /users
 router.post("/", createUser);
