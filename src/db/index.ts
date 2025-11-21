@@ -85,11 +85,13 @@ export async function resetDatabase(): Promise<void> {
     await db.query("DROP TABLE IF EXISTS ticket_activities CASCADE");
     await db.query("DROP TABLE IF EXISTS kb_articles CASCADE");
     await db.query("DROP TABLE IF EXISTS automations CASCADE");
-    await db.query("DROP TABLE IF EXISTS sla_policies CASCADE");
-    await db.query("DROP TABLE IF EXISTS forms CASCADE");
-    await db.query("DROP TABLE IF EXISTS ticket_approvals CASCADE");
+    await db.query("DROP TABLE IF EXISTS sla_compliance CASCADE");
+    // await db.query("DROP TABLE IF EXISTS sla_policies CASCADE");
+    // await db.query("DROP TABLE IF EXISTS forms CASCADE");
+    await db.query("DROP TABLE IF EXISTS ticket_attachments CASCADE");
     await db.query("DROP TABLE IF EXISTS tickets CASCADE");
-    await db.query("DROP TABLE IF EXISTS categories CASCADE");
+    // await db.query("DROP TABLE IF EXISTS ticket_priorities CASCADE");
+    // await db.query("DROP TABLE IF EXISTS categories CASCADE");
     await db.query("DROP TABLE IF EXISTS ticket_counter CASCADE");
     await db.query("DROP TABLE IF EXISTS branches CASCADE");
     await db.query("DROP TABLE IF EXISTS departments CASCADE");
