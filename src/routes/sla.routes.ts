@@ -1,11 +1,15 @@
 import { Router } from "express";
-import { createSLAPolicy, deleteSLAPolicyById, getAllSLAPolicies, updateSLAPolicy } from "../controllers/sla.controller";
+import { createBulkSLApolicies, createSLAPolicy, deleteSLAPolicyById, getAllSLAPolicies, updateSLAPolicy } from "../controllers/sla.controller";
 
 const router = Router();
 
 router.get("/", getAllSLAPolicies);
 
+// router.get("/:ticketId/:priorityId/compliance", testFunction);
+
 router.post("/", createSLAPolicy);
+
+router.post("/bulk", createBulkSLApolicies);
 
 router.delete("/:id", deleteSLAPolicyById);
 
