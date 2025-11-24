@@ -21,6 +21,7 @@ import { db, initializeDatabase, resetDatabase } from "./db/index";
 import { sendPasswordSetupEmail, sendTestEmail } from "./utils/email";
 import { newSetupHandlers } from "./websockets/ticket.socket";
 import { addEmailToQueue } from "./utils/bull-email";
+import { logRequest } from "./utils/logger";
 
 const app: Application = express();
 const httpServer = createServer(app);
@@ -50,10 +51,8 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-
-app.get("/", (req: Request, res: Response) => {
-  res.send("Helpdesk Be API is running");
-});
+// implement a rubust logging for every request 
+app.use(logRequest);
 
 // API routes
 app.use("/api/v1/auth", authRoutes);
@@ -198,38 +197,11 @@ const startServer = async () => {
       console.log(` CORS enabled for: ${process.env.FRONTEND_URL}`);
       console.log(` Environment: ${process.env.NODE_ENV}\n`);
     });
-
-    // // Initialize database tables
-    // console.log("🏗️  Initializing database tables...");
-    // initializeDatabase()
-    //   .then(() => {
-    //     console.log("✅ Database tables initialized");
-    //     // Start server
-    //     app.listen(PORT, () => {
-    //       console.log("\n Server is running!");
-    //       console.log(` Health check: http://localhost:${PORT}/api/health`);
-    //       console.log(` API base URL: http://localhost:${PORT}/api/v1`);
-    //       console.log(` CORS enabled for: ${process.env.FRONTEND_URL}`);
-    //       console.log(` Environment: ${process.env.NODE_ENV}\n`);
-    //     });
-    //   })
-    //   .catch((error) => {
-    //     console.error("❌ Failed to start server:", error);
-    //     process.exit(1);
-    //   })
-    //   .finally(() => {
-    //     console.log("🔚 Server startup process finished");
-    //   });
   } catch (error) {
     console.error("❌ Failed to start server:", error);
+    await db.end();
     process.exit(1);
   }
 };
 
 startServer();
-
-// GL && UAT
-// (exceptional cases)Vat should be applied on risk instead of policy. in the event where a policy has multiple risks with different vat rates or some risks are zero rate, the vat amount will be incorrect if applied on the total policy premium.
-// invoice processing work flow
-// GRA Vat (input tax) to reduce output tax on vat return
-// GRA vat to be claimed on purchases
