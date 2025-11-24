@@ -43,7 +43,7 @@ export async function getUserGroupModel(roles: string[]) {
 }
 
 export async function getFormattedUsersByEmailModel(emails: string[]) {
-  const users = await db.query("SELECT * FROM users WHERE email = ANY($1)", [emails]);
+  const users = await db.query("SELECT * FROM users WHERE id = ANY($1)", [emails]);
   if (users.rowCount === 0) {
     return null;
   }
