@@ -49,6 +49,15 @@ CREATE TABLE IF NOT EXISTS sla_policies (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Ticket Statuses table
+CREATE TABLE IF NOT EXISTS ticket_statuses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(100) NOT NULL,
+  enabled BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Ticket Priorities table
 CREATE TABLE IF NOT EXISTS ticket_priorities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -78,7 +87,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   created_by UUID REFERENCES users(id),
   created_for UUID REFERENCES users(id),
   category_id UUID REFERENCES categories(id),
-  status VARCHAR(32) NOT NULL,
+  status_id UUID REFERENCES ticket_statuses(id),
   priority_id UUID REFERENCES ticket_priorities(id),
   -- sla_policy_id UUID REFERENCES sla_policies(id) ON DELETE CASCADE,
   assignee_id UUID REFERENCES users(id),
