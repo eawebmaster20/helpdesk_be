@@ -162,6 +162,7 @@ export const sendEmail = async (
   attachmentName?: string
 ) => {
   // Early check for email activation
+  console.log('validating email sending activation status...');
   if (
     !process.env.ACTIVATE_EMAIL ||
     process.env.ACTIVATE_EMAIL.toLowerCase() !== "true"
@@ -208,7 +209,6 @@ export const sendEmail = async (
       console.warn(`Unknown email type: ${type}`);
   }
   try {
-    console.log("to:", to);
     const userEmails = await getFormattedUsersByEmailModel(to);
     if (!userEmails) {
       console.warn("No valid user emails found for the provided IDs.");
