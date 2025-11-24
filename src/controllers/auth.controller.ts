@@ -5,15 +5,13 @@ import {
   insertUserModel,
   updateUserModel,
 } from "../models/users.model";
-import { authenticate } from "../middlewares/authenticate.utils";
-import { verify } from "crypto";
 
 import { Client, Attribute, Change } from "ldapts";
 import { db } from "../db";
 import { parseLDAPDN } from "../utils/ldap";
 import { generateUserToken } from "../middlewares/jwt.utils";
-import { error } from "console";
 import { pushUserListUpdateToAdminDashboard } from "../websockets/ticket.socket";
+import { appLogger } from "../utils/logger";
 
 export async function login(req: Request, res: Response) {
   if (req.body.username === process.env.ADMIN_USERNAME && req.body.password === process.env.SERVICE_DESK_PASSWORD) {
@@ -41,7 +39,8 @@ export async function login(req: Request, res: Response) {
     
  
     if (!ldapUser || !ldapUser.dn) {
-      return res.status(401).json({ message: "LDAP authentication failed", status: 'error', error: ldapUser});
+      const {errorCode, traceId} =  appLogger.error('LDAP_AUTHENTICATION_FAILED', { username: req.body.username }, ldapUser);
+      return res.status(401).json({ message: "Authentication failed", errorCode, traceId, status: 'error' });
     }
     
     
@@ -172,8 +171,8 @@ export async function login(req: Request, res: Response) {
     });
     
   } catch (err) {
-    // console.error('Login error:', err);
-    res.status(500).json({ message: "Authentication error", error: err, status: 'error' });
+    const {errorCode, traceId} =  appLogger.error('LDAP_AUTHENTICATION_FAILED', { username: req.body.username }, err as any);
+    res.status(500).json({ message: "Authentication error", errorCode, traceId, status: 'error' });
   }
 }
 
