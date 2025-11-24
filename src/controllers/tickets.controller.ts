@@ -18,7 +18,7 @@ import { addSLACompliance } from "../models/sla.model";
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
-  const { title, userId, description, status, priority, priorityName, assigneeId } = req.body;
+  const { title, userId, description, status, priorityId, categoryId, assigneeId } = req.body;
   try {
     const unUpdatedTicket = await getFormatedTicketsIdModel(id);
     const result = await updateTicketModel(
@@ -26,7 +26,8 @@ export async function updateTicket(req: Request, res: Response) {
       title,
       description,
       status,
-      priority,
+      priorityId,
+      categoryId,
       assigneeId
     );
     if (result.rows.length === 0) {
@@ -36,17 +37,25 @@ export async function updateTicket(req: Request, res: Response) {
     const updatedTicket = await getFormatedTicketsIdModel(id);
     let action = ""
     // Determine what was updated for activity tracking
-    if (title && title !== updatedTicket.title) {
+    if (title && title !== unUpdatedTicket.title) {
       action += `changed title from "${title}" to "${updatedTicket.title}". `;
     }
-    if (description && description !== updatedTicket.description) {
+    if (description && description !== unUpdatedTicket.description) {
       action += `changed description from "${description}" to "${updatedTicket.description}". `;
     }
-    if (status && status !== updatedTicket.status) {
+    if (status && status !== unUpdatedTicket.status) {
       action += `changed status from "${unUpdatedTicket.status}" to "${updatedTicket.status}". `;
     }
-    if (priority && priority !== updatedTicket.priority) {
-      action += `changed priority from "${unUpdatedTicket.priority?.name}" to "${updatedTicket.priority?.name}". `;
+    if ((priorityId && priorityId !== unUpdatedTicket.priority?.id) || (categoryId && categoryId !== unUpdatedTicket.category?.id)) {
+      if (priorityId && !categoryId) {
+        action += `changed priority from "${unUpdatedTicket.priority?.name}" to "${updatedTicket.priority?.name}". `;
+      }
+      if (!priorityId && categoryId) {
+        action += `changed category from "${unUpdatedTicket.category?.name}" to "${updatedTicket.category?.name}". `;
+      }
+      if (priorityId && categoryId) {
+        action += `changed priority from "${unUpdatedTicket.priority?.name}" to "${updatedTicket.priority?.name}" and category from "${unUpdatedTicket.category?.name}" to "${updatedTicket.category?.name}". `;
+      }
     }
     // if (assigneeId !== ticketResult.assignee?.id) {
     //   action += `Reassigned assignee from "${ticketResult.assignee?.name}" to "${assigneeId}". `;
@@ -54,15 +63,20 @@ export async function updateTicket(req: Request, res: Response) {
     await addTicketActivityModel(id, 'status', userId, action);
     const usersToNotify = new Set<string>();
     usersToNotify.add(`${updatedTicket.created_by?.id}:ticket:update`);
-    usersToNotify.add(`${updatedTicket.assignee?.id}:ticket:update`);
+    if (updatedTicket.created_for?.id) {
+      usersToNotify.add(`${updatedTicket.created_for.id}:ticket:update`);
+    }
+    if (updatedTicket.assignee?.id) {
+      usersToNotify.add(`${updatedTicket.assignee.id}:ticket:update`);
+    }
     usersToNotify.add(`tickets:update`);
     if (updatedTicket.created_for?.id) {
       usersToNotify.add(`${updatedTicket.created_for.id}:ticket:update`);
     }
     const usersToEmail = [
-      updatedTicket.created_by?.email,
-      // updatedTicket.assignee?.email,
-      updatedTicket.created_for?.email
+      updatedTicket.created_by?.id,
+      // updatedTicket.assignee?.id,
+      updatedTicket.created_for?.id
     ].filter(Boolean) as string[];
 
     res.status(200).json();
@@ -80,10 +94,10 @@ export async function updateTicket(req: Request, res: Response) {
   }
 }
 
-export async function editTicket(req: Request, res: Response) {
-  const { id } = req.params;
-  const { title, description, status, priority, assigneeId, userId } = req.body;
-}
+// export async function editTicket(req: Request, res: Response) {
+//   const { id } = req.params;
+//   const { title, description, status, priority, assigneeId, userId } = req.body;
+// }
 
 export async function addTicketComment(req: Request, res: Response) {
   const { id } = req.params;
@@ -212,7 +226,6 @@ export async function assignTicket(req: Request, res: Response) {
       `${createdBy}:ticket:update`,
       `tickets:update`
     ];
-
     emitUserTicketAssign(io, assigneeId, usersInvolved, {
       data: ticket,
       message: "A ticket has been assigned",
@@ -224,7 +237,7 @@ export async function assignTicket(req: Request, res: Response) {
       ticket.assignee?.id,
       // ticket.created_by?.id
     ].filter(Boolean) as string[];
-    sendEmail('ticket_assigned', usersToEmail, `Ticket ${ticket.ticket_number} has been assigned`, ticket);
+    sendEmail('ticket_assigned', usersToEmail, `Ticket ${ticket.ticket_number} has been assigned to You`, ticket);
     res.json({ message: "Assigned", data:[] });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
