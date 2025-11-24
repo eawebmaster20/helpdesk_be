@@ -6,6 +6,7 @@ import {
   updateUserModel,
 } from "../models/users.model";
 import { pushUserListUpdateToAdminDashboard } from "../websockets/ticket.socket";
+import { appLogger } from "../utils/logger";
 
 export async function getUsers(req: Request, res: Response) {
   try {
@@ -16,7 +17,8 @@ export async function getUsers(req: Request, res: Response) {
       status: 'success'
     });
   } catch (err) {
-    res.status(500).json({ message: "Database error", error: err });
+      const {errorCode, traceId} =  appLogger.error('DATABASE_ERROR', {}, err as any);
+    res.status(500).json({ message: "Database error", errorCode, traceId, status: 'error' });
   }
 }
 
@@ -30,7 +32,8 @@ export async function getUserGroup(req: Request, res: Response) {
       status: 'success'
     });
   } catch (err) {
-    res.status(500).json({ message: "Database error", error: err });
+    const {errorCode, traceId} =  appLogger.error('DATABASE_ERROR', {}, err as any);
+    res.status(500).json({ message: "Database error", errorCode, traceId, status: 'error' });
   }
 }
 
@@ -45,7 +48,8 @@ export async function getAgents(req: Request, res: Response) {
       status: 'success'
     });
   } catch (err) {
-    res.status(500).json({ message: "Database error", error: err });
+    const {errorCode, traceId} =  appLogger.error('DATABASE_ERROR', { roles: req.body.roles }, err as any);
+    res.status(500).json({ message: "Database error", errorCode, traceId, status: 'error' });
   }
 }
 
@@ -60,7 +64,8 @@ export async function createUser(req: Request, res: Response) {
     const result = await insertUserModel(name, email, role, departmentId);
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ message: "Database error", error: err });
+     const {errorCode, traceId} =  appLogger.error('DATABASE_ERROR', {}, err as any);
+    res.status(500).json({ message: "Database error", errorCode, traceId, status: 'error' });
   }
 }
 
@@ -75,6 +80,7 @@ export async function updateUser(req: Request, res: Response) {
     await pushUserListUpdateToAdminDashboard()
     res.status(200).json('ok');
   } catch (err) {
-    res.status(500).json({ message: "Database error", error: err });
+    const {errorCode, traceId} =  appLogger.error('DATABASE_ERROR', {payload: req.body}, err as any);
+    res.status(500).json({ message: "Database error", errorCode, traceId, status: 'error' });
   }
 }
