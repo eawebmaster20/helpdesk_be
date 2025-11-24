@@ -520,7 +520,8 @@ export async function updateTicketModel(
   title?: string,
   description?: string,
   status?: string,
-  priority?: string,
+  priorityId?: string,
+  categoryId?: string,
   assigneeId?: string
 ) {
   return db.query(
@@ -529,10 +530,11 @@ export async function updateTicketModel(
       description = COALESCE($2, description),
       status = COALESCE($3, status),
       priority_id = COALESCE($4, priority_id),
-      assignee_id = COALESCE($5, assignee_id),
+      category_id = COALESCE($5, category_id),
+      assignee_id = COALESCE($6, assignee_id),
       updated_at = NOW()
-    WHERE id = $6 RETURNING *`,
-    [title, description, status, priority, assigneeId, id]
+    WHERE id = $7 RETURNING *`,
+    [title, description, status, priorityId, categoryId, assigneeId, id]
   );
 }
 
