@@ -70,7 +70,7 @@ export const getTicketCreatedHtmlContent = (ticket: FormattedTicket) => `
                                     <td style="padding: 15px 20px;">
                                         <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
                                             <strong>Need Urgent Assistance?</strong><br>
-                                            For critical issues, please call our help desk at <strong>(555) 123-4567</strong> or use the live chat feature on our support portal.
+                                            For critical issues, please call our help desk at <strong>5003 | 5005 | 5006</strong> or use the live chat feature on our support portal.
                                         </p>
                                     </td>
                                 </tr>
@@ -158,7 +158,7 @@ export const getTicketUpdatedHtmlContent = (ticket: FormattedTicket) => `
                                     <td style="padding: 15px 20px;">
                                         <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
                                             <strong>Need Urgent Assistance?</strong><br>
-                                            For critical issues, please call our help desk at <strong>(555) 123-4567</strong> or use the live chat feature on our support portal.
+                                            For critical issues, please call our help desk at <strong>5003 | 5005 | 5006</strong> or use the live chat feature on our support portal.
                                         </p>
                                     </td>
                                 </tr>
@@ -243,7 +243,7 @@ export const getCommentAddedHtmlContent = (ticket: FormattedTicket, comment: str
                                     <td style="padding: 15px 20px;">
                                         <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
                                             <strong>Need Urgent Assistance?</strong><br>
-                                            For critical issues, please call our help desk at <strong>(555) 123-4567</strong> or use the live chat feature on our support portal.
+                                            For critical issues, please call our help desk at <strong>5003 | 5005 | 5006</strong> or use the live chat feature on our support portal.
                                         </p>
                                     </td>
                                 </tr>
@@ -261,7 +261,7 @@ export const getCommentAddedHtmlContent = (ticket: FormattedTicket, comment: str
                             <p style="color: #718096; font-size: 13px; line-height: 1.6; margin: 0 0 15px 0;">
                                 <strong style="color: #1a1a1a;">IT Support Department</strong><br>
                                 Email: itsupport@starassurance.com<br>
-                                Phone: (555) 123-4567<br>
+                                Phone: 5003 | 5005 | 5006<br>
                                 <!-- Hours: Monday - Friday, 8:00 AM - 6:00 PM EST -->
                             </p>
 
@@ -321,12 +321,11 @@ export const getTicketAssignedHtmlContent = (ticket: FormattedTicket) => `
 
                     <!-- Content -->
                     <tr>
-                        <td style="padding: 40px 30px;">
-                            <div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+                        <td style="padding: 25px 0;">
+                            <div style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
                                 <h2 style="color: #1a1a1a;">Ticket Assigned: #${ticket.ticket_number}</h2>
-                                <p>Hello ${ticket.created_by?.name ? ticket.created_by.name : 'Brightest Star'},</p>
-                                <p>Your ticket has been assigned to a new user, and is currently being reviewed.</p>
-                                <p>Thank you for your patience as we work to resolve your issue.</p>
+                                <p>Hello ${ticket.assignee?.name ? ticket.assignee.name : 'Brightest Star'}, Ticket No #${ticket.ticket_number} has been assigned to you, </p>
+                                <p>Kindly review it on your dashboard at your earliest convenience.</p>
                                 <p>Best regards,<br>The IT Department</p>
                             </div>
 
@@ -337,7 +336,7 @@ export const getTicketAssignedHtmlContent = (ticket: FormattedTicket) => `
                                     <td style="padding: 15px 20px;">
                                         <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
                                             <strong>Need Urgent Assistance?</strong><br>
-                                            For critical issues, please call our help desk at <strong>(555) 123-4567</strong> or use the live chat feature on our support portal.
+                                            For critical issues, please call our help desk at <strong>5003 | 5005 | 5006</strong> or use the live chat feature on our support portal.
                                         </p>
                                     </td>
                                 </tr>
@@ -355,7 +354,7 @@ export const getTicketAssignedHtmlContent = (ticket: FormattedTicket) => `
                             <p style="color: #718096; font-size: 13px; line-height: 1.6; margin: 0 0 15px 0;">
                                 <strong style="color: #1a1a1a;">IT Support Department</strong><br>
                                 Email: itsupport@starassurance.com<br>
-                                Phone: (555) 123-4567<br>
+                                Phone: 5003 | 5005 | 5006<br>
                                 <!-- Hours: Monday - Friday, 8:00 AM - 6:00 PM EST -->
                             </p>
 
@@ -386,3 +385,36 @@ export const getTicketAssignedHtmlContent = (ticket: FormattedTicket) => `
     </table>
 </div>
 `;
+
+
+// error codes
+export const ERROR_CODES:{[key: string]: {code: string, message: string}} = {
+    AUTH_INVALID_CREDENTIALS: {code: "ERR-1001", message: "Invalid credentials provided."},
+    AUTH_UNAUTHORIZED: {code: "ERR-1002", message: "Unauthorized access."},
+    USER_NOT_FOUND: {code: "ERR-2001", message: "User not found."},
+
+    // tickets errors
+    TICKET_NOT_FOUND: {code: "ERR-3001", message: "Ticket not found."},
+    TICKET_CREATION_FAILED: {code: "ERR-3002", message: "Failed to create ticket."},
+    TICKET_UPDATE_FAILED: {code: "ERR-3003", message: "Failed to update ticket."},
+    TICKET_DELETE_FAILED: {code: "ERR-3004", message: "Failed to delete ticket."},
+    TICKET_ATTACHMENT_FAILED: {code: "ERR-3005", message: "Failed to add attachment to ticket."},
+
+    // email errors
+    EMAIL_SENDING_FAILED: {code: "ERR-4001", message: "Failed to send email."},
+    EMAIL_QUEUE_FAILED: {code: "ERR-4002", message: "Failed to add email to queue."},
+
+    // database errors
+    DB_CONNECTION_FAILED: {code: "ERR-5001", message: "Database connection failed."},
+    DB_QUERY_FAILED: {code: "ERR-5002", message: "Database query failed."},
+    DB_TRANSACTION_FAILED: {code: "ERR-5003", message: "Database transaction failed."},
+    DB_RECORD_NOT_FOUND: {code: "ERR-5004", message: "Database record not found."},
+    DB_DUPLICATE_ENTRY: {code: "ERR-5005", message: "Duplicate entry in database."},
+    DATABASE_ERROR: {code: "ERR-5006", message: "A database error occurred."},
+
+    // validation errors
+    VALIDATION_FAILED: {code: "ERR-6001", message: "Data validation failed."},
+    INVALID_INPUT: {code: "ERR-6002", message: "Invalid input provided."},
+
+    SYSTEM_UNKNOWN_ERROR: {code: "ERR-9001", message: "An unknown error occurred."},
+};
