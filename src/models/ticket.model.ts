@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { getAllStatusesModel } from "./statuses.model";
 
 
 export interface Department {
@@ -28,15 +29,7 @@ export interface Ticket {
   description: string;
   departmentId: string;
   createdBy: string; // userId
-  status:
-    | "New"
-    | "Pending Approval"
-    | "Dept Head Approved"
-    | "HR Approved"
-    | "Assigned"
-    | "In Progress"
-    | "Resolved"
-    | "Closed";
+  status:string;
   priority: string;
   assigneeId?: string;
   approvals: TicketApproval[];
@@ -46,7 +39,7 @@ export interface Ticket {
 
 export interface TicketApproval {
   step: "department_head" | "hr";
-  status: "Pending" | "Approved" | "Rejected";
+  status: string;
   decidedBy?: string; // userId
   decidedAt?: string;
   comment?: string;
@@ -57,7 +50,12 @@ export interface FormattedTicket {
   ticket_number: string;
   title: string;
   description: string;
-  status: string;
+  status: {
+    id: string;
+    name: string;
+    class: string;
+    enabled: boolean;
+  } | null;
   active: boolean;
   priority: {
     id: string;
@@ -99,15 +97,15 @@ export interface FormattedTicket {
   } | null;
 }
 
-export async function getTicketsModel() {
-  return db.query("SELECT * FROM tickets ORDER BY created_at DESC");
-}
+// export async function getTicketsModel() {
+//   return db.query("SELECT * FROM tickets ORDER BY created_at DESC");
+// }
 
 export async function getFormatedTicketsModel(userId?: string, pagination?: { page: number; limit: number }, filter?: { status?: string; priority?: string }) {
   let result;
   if (userId) {
     result = await db.query(`
-      SELECT
+            SELECT
         t.*,
         COALESCE(
           ARRAY_AGG(a.url) FILTER (WHERE a.url IS NOT NULL), 
@@ -129,6 +127,19 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
         p.name as priority_name,
         p.id as priority_id,
         p.enabled as priority_enabled,
+        s.name as status_name,
+        s.id as status_id,
+        s.css_class as status_class,
+        s.enabled as status_enabled,
+        sc.id as sla_compliance_id,
+        sc.responded_at as sla_responded_at,
+        sc.resolved_at as sla_resolved_at,
+        sc.resolution_met as sla_resolution_met,
+        sc.response_met as sla_response_met,
+        ta_escalation.created_at as escalated_time,
+        u_escalator.id as escalated_by_id,
+        u_escalator.name as escalated_by_name,
+        u_escalator.email as escalated_by_email,
         sla.id as sla_id,
         sla.name as sla_name,
         sla.response_time_hours as sla_response_time_hours,
@@ -138,22 +149,34 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
       LEFT JOIN departments d ON t.department_id = d.id
       LEFT JOIN categories c ON t.category_id = c.id
       LEFT JOIN ticket_priorities p ON t.priority_id = p.id
+      LEFT JOIN ticket_statuses s ON t.status_id = s.id
       LEFT JOIN sla_policies sla ON p.sla_policy_id = sla.id
+      LEFT JOIN sla_compliance sc ON t.id = sc.ticket_id AND p.sla_policy_id = sc.sla_policy_id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
       LEFT JOIN users u_owner ON t.created_for = u_owner.id
+      LEFT JOIN ticket_activities ta_escalation ON t.id = ta_escalation.ticket_id 
+        AND ta_escalation.type = 'assignment' 
+        AND ta_escalation.created_at = (
+          SELECT MIN(created_at) FROM ticket_activities 
+          WHERE ticket_id = t.id AND type = 'assignment'
+        )
+      LEFT JOIN users u_escalator ON ta_escalation.user_id = u_escalator.id
       WHERE t.created_by = $1 or t.created_for = $1
       GROUP BY t.id, d.id, d.name, c.id, c.name, c.description, 
                u_creator.id, u_creator.name, u_creator.email,
                u_owner.id, u_owner.name, u_owner.email,
                u_assignee.id, u_assignee.name, u_assignee.email,
                p.id, p.name, p.enabled,
+               s.id, s.name, s.enabled, s.css_class,
+               sc.id, sc.responded_at, sc.resolved_at, sc.response_met, sc.resolution_met,
+               ta_escalation.created_at, u_escalator.id, u_escalator.name, u_escalator.email,
                sla.id, sla.name, sla.response_time_hours, sla.resolution_time_hours
       ORDER BY t.created_at DESC
     `, [userId]);
   } else {
     result = await db.query(`
-      SELECT
+            SELECT
         t.*,
         COALESCE(
           ARRAY_AGG(a.url) FILTER (WHERE a.url IS NOT NULL), 
@@ -175,6 +198,19 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
         p.name as priority_name,
         p.id as priority_id,
         p.enabled as priority_enabled,
+        s.name as status_name,
+        s.id as status_id,
+        s.css_class as status_class,
+        s.enabled as status_enabled,
+        sc.id as sla_compliance_id,
+        sc.responded_at as sla_responded_at,
+        sc.resolved_at as sla_resolved_at,
+        sc.resolution_met as sla_resolution_met,
+        sc.response_met as sla_response_met,
+        ta_escalation.created_at as escalated_time,
+        u_escalator.id as escalated_by_id,
+        u_escalator.name as escalated_by_name,
+        u_escalator.email as escalated_by_email,
         sla.id as sla_id,
         sla.name as sla_name,
         sla.response_time_hours as sla_response_time_hours,
@@ -184,15 +220,27 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
       LEFT JOIN departments d ON t.department_id = d.id
       LEFT JOIN categories c ON t.category_id = c.id
       LEFT JOIN ticket_priorities p ON t.priority_id = p.id
+      LEFT JOIN ticket_statuses s ON t.status_id = s.id
       LEFT JOIN sla_policies sla ON p.sla_policy_id = sla.id
+      LEFT JOIN sla_compliance sc ON t.id = sc.ticket_id AND p.sla_policy_id = sc.sla_policy_id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
       LEFT JOIN users u_owner ON t.created_for = u_owner.id
+      LEFT JOIN ticket_activities ta_escalation ON t.id = ta_escalation.ticket_id 
+        AND ta_escalation.type = 'assignment' 
+        AND ta_escalation.created_at = (
+          SELECT MIN(created_at) FROM ticket_activities 
+          WHERE ticket_id = t.id AND type = 'assignment'
+        )
+      LEFT JOIN users u_escalator ON ta_escalation.user_id = u_escalator.id
       GROUP BY t.id, d.id, d.name, c.id, c.name, c.description, 
                u_creator.id, u_creator.name, u_creator.email,
                u_owner.id, u_owner.name, u_owner.email,
                u_assignee.id, u_assignee.name, u_assignee.email,
                p.id, p.name, p.enabled,
+                s.id, s.name, s.enabled, s.css_class,
+               sc.id, sc.responded_at, sc.resolved_at, sc.response_met, sc.resolution_met,
+               ta_escalation.created_at, u_escalator.id, u_escalator.name, u_escalator.email,
                sla.id, sla.name, sla.response_time_hours, sla.resolution_time_hours
       ORDER BY t.created_at DESC
     `);
@@ -203,7 +251,12 @@ export async function getFormatedTicketsModel(userId?: string, pagination?: { pa
     ticket_number: row.ticket_number,
     title: row.title,
     description: row.description,
-    status: row.status,
+    status: row.status_id ? {
+      id: row.status_id,
+      name: row.status_name,
+      class: row.status_class,
+      enabled: row.status_enabled
+      } : null,
     active: row.active,
     priority: row.priority_id ? {
       id: row.priority_id,
@@ -271,6 +324,10 @@ export async function getFormatedTicketsIdModel(id: string): Promise<FormattedTi
         p.name as priority_name,
         p.id as priority_id,
         p.enabled as priority_enabled,
+        s.name as status_name,
+        s.id as status_id,
+        s.css_class as status_class,
+        s.enabled as status_enabled,
         sc.id as sla_compliance_id,
         sc.responded_at as sla_responded_at,
         sc.resolved_at as sla_resolved_at,
@@ -289,6 +346,7 @@ export async function getFormatedTicketsIdModel(id: string): Promise<FormattedTi
       LEFT JOIN departments d ON t.department_id = d.id
       LEFT JOIN categories c ON t.category_id = c.id
       LEFT JOIN ticket_priorities p ON t.priority_id = p.id
+      LEFT JOIN ticket_statuses s ON t.status_id = s.id
       LEFT JOIN sla_policies sla ON p.sla_policy_id = sla.id
       LEFT JOIN sla_compliance sc ON t.id = sc.ticket_id AND p.sla_policy_id = sc.sla_policy_id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
@@ -307,6 +365,7 @@ export async function getFormatedTicketsIdModel(id: string): Promise<FormattedTi
                u_owner.id, u_owner.name, u_owner.email,
                u_assignee.id, u_assignee.name, u_assignee.email,
                p.id, p.name, p.enabled,
+                s.id, s.name, s.enabled, s.css_class,
                sc.id, sc.responded_at, sc.resolved_at, sc.response_met, sc.resolution_met,
                ta_escalation.created_at, u_escalator.id, u_escalator.name, u_escalator.email,
                sla.id, sla.name, sla.response_time_hours, sla.resolution_time_hours
@@ -318,7 +377,12 @@ export async function getFormatedTicketsIdModel(id: string): Promise<FormattedTi
     ticket_number: row.ticket_number,
     title: row.title,
     description: row.description,
-    status: row.status,
+    status: row.status_id ? {
+      id: row.status_id,
+      name: row.status_name,
+      class: row.status_class,
+      enabled: row.status_enabled,
+    } : null,
     active: row.active,
     escalated_time: row.escalated_time,
     escalated_by: row.escalated_by_id ? {
@@ -396,6 +460,10 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
         p.name as priority_name,
         p.id as priority_id,
         p.enabled as priority_enabled,
+        s.name as status_name,
+        s.id as status_id,
+        s.css_class as status_class,
+        s.enabled as status_enabled,
         sc.id as sla_compliance_id,
         sc.responded_at as sla_responded_at,
         sc.resolved_at as sla_resolved_at,
@@ -409,6 +477,7 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
       LEFT JOIN ticket_attachments a ON t.id = a.ticket_id
       LEFT JOIN branches b ON t.branch_id = b.id
       LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN ticket_statuses s ON t.status_id = s.id
       LEFT JOIN ticket_priorities p ON t.priority_id = p.id
       LEFT JOIN sla_compliance sc ON t.id = sc.ticket_id AND p.sla_policy_id = sc.sla_policy_id
       LEFT JOIN users u_creator ON t.created_by = u_creator.id
@@ -425,6 +494,7 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
                u_creator.id, u_creator.name, u_creator.email,
                u_assignee.id, u_assignee.name, u_assignee.email,
                p.id, p.name, p.enabled,
+                s.id, s.name, s.enabled, s.css_class,
                sc.id, sc.responded_at, sc.resolved_at, sc.response_met, sc.resolution_met,
                ta_escalation.created_at, u_escalator.id, u_escalator.name, u_escalator.email
       ORDER BY t.created_at DESC
@@ -434,7 +504,12 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
     ticket_number: row.ticket_number,
     title: row.title,
     description: row.description,
-    status: row.status,
+    status: row.status_id ? {
+      id: row.status_id,
+      name: row.status_name,
+      class: row.status_class,
+      enabled: row.status_enabled
+    } : null,
     active: row.active,
     escalated_time: row.escalated_time,
     escalated_by: row.escalated_by_id ? {
@@ -484,6 +559,11 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
     return formatedResults;
 }
 
+export async function getTotalTicketsModel() {
+  const result =  await db.query("SELECT COUNT(*) FROM tickets");
+  return  parseInt(result.rows[0].count, 10) ;
+}
+
 // export async function getSLAComplianceByTicketIdModel(ticketId: string, priorityId: string, slaId?: string) {
 //   const ticket = await db.query("SELECT * FROM tickets WHERE priority_id = $1 AND id = $2", [priorityId, ticketId]);
 //   const priority = await db.query("SELECT * FROM ticket_priorities WHERE id = $1 ", [ ticket.rows[0].priority_id ]);
@@ -502,12 +582,13 @@ export async function createTicketModel(
   departmentId: string,
   createdBy: string,
   createdFor: string,
-  priority: string,
+  priorityId: string,
+  statusId: string,
   categoryId?: string,
 ) {
   return db.query(
-    `INSERT INTO tickets (ticket_number, title, description, department_id, created_by, created_for, status, priority, category_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-    [ticketNumber, title, description, departmentId, createdBy, createdFor, "New", priority, categoryId]
+    `INSERT INTO tickets (ticket_number, title, description, department_id, created_by, created_for, status, priority_id, category_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [ticketNumber, title, description, departmentId, createdBy, createdFor, statusId, priorityId, categoryId]
   );
 }
 
@@ -519,7 +600,7 @@ export async function updateTicketModel(
   id: string,
   title?: string,
   description?: string,
-  status?: string,
+  statusId?: string,
   priorityId?: string,
   categoryId?: string,
   assigneeId?: string
@@ -528,20 +609,20 @@ export async function updateTicketModel(
     `UPDATE tickets SET
       title = COALESCE($1, title),
       description = COALESCE($2, description),
-      status = COALESCE($3, status),
+      status_id = COALESCE($3, status_id),
       priority_id = COALESCE($4, priority_id),
       category_id = COALESCE($5, category_id),
       assignee_id = COALESCE($6, assignee_id),
       updated_at = NOW()
     WHERE id = $7 RETURNING *`,
-    [title, description, status, priorityId, categoryId, assigneeId, id]
+    [title, description, statusId, priorityId, categoryId, assigneeId, id]
   );
 }
 
-export async function closeTicketModel(id: string) {
+export async function closeTicketModel(id: string, statusId: string) {
   return db.query(
-    `UPDATE tickets SET status = 'Closed', active = FALSE, updated_at = NOW() WHERE id = $1`,
-    [id]
+    `UPDATE tickets SET status_id = $1, active = FALSE, updated_at = NOW() WHERE id = $2`,
+    [statusId, id]
   );
 }
 
@@ -575,10 +656,10 @@ export async function addTicketAttachmentModel(
   return rows;
 }
 
-export async function assignTicketModel(id: string, assigneeId: string) {
+export async function assignTicketModel(id: string, assigneeId: string, statusId: string) {
   return db.query(
-    `UPDATE tickets SET assignee_id = $1, status = 'Assigned', updated_at = NOW() WHERE id = $2 RETURNING *`,
-    [assigneeId, id]
+    `UPDATE tickets SET assignee_id = $1, status_id = $2, updated_at = NOW() WHERE id = $3 RETURNING *`,
+    [assigneeId, statusId, id]
   );
 }
 
@@ -650,4 +731,21 @@ export async function getTicketActivitiesModel(ticketId:any) {
             email: row.user_email
           }
         }));
+}
+
+
+export async function getTicketSummaryModel() {
+  const ticketStatuses = await getAllStatusesModel();
+  const closedStatus = ticketStatuses.find(status => status.name.toLowerCase() === 'closed');
+  return await db.query(`
+    SELECT 
+      EXTRACT(YEAR FROM created_at) AS year,
+      EXTRACT(MONTH FROM created_at) AS month,
+      COUNT(*) AS total_tickets,
+      SUM(CASE WHEN status_id = '${closedStatus?.id}' THEN 1 ELSE 0 END) AS closed_tickets,
+      SUM(CASE WHEN status_id != '${closedStatus?.id}' THEN 1 ELSE 0 END) AS open_tickets
+    FROM tickets
+    GROUP BY year, month
+    ORDER BY year DESC, month DESC
+  `);
 }
