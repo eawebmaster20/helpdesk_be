@@ -5,13 +5,17 @@ import {
   addTicketActivityModel, 
   getFormatedL2TicketsModel, 
   getFormatedTicketsModel, 
-  getTicketActivitiesModel 
+  getTicketActivitiesModel, 
+  getTotalTicketsModel
 } from "../models/ticket.model";
 
 import { io as mainSocketServer} from "../index";
 import { getFormatedUsersModel, getUsersModel } from "../models/users.model";
 import { getFormatedBranchesModel } from "../models/branches.model";
 import { getFormatedDepartmentsModel } from "../models/departments.model";
+import { tickets } from "../storage/memory";
+import { emit } from "process";
+import { getMonthlyTicketSummary } from "../controllers/tickets.controller";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -131,9 +135,23 @@ export function newSetupHandlers(io: Server) {
         data: departmentsData,
         message: "Departments retrieved successfully"
       }
+      const totalTickets = await getTotalTicketsModel();
+      const ticketsPayload = {
+        success: true,
+        data: totalTickets,
+        message: "Total tickets retrieved successfully"
+      };
+      const monthlyTicketsSummary = await getMonthlyTicketSummary();
+      const monthlyTicketsSummaryPayload = {
+        success: true,
+        data: monthlyTicketsSummary,
+        message: "Monthly tickets summary retrieved successfully"
+      };
       emitL3(io, ['users:all'], payload);
       emitL3(io, ['branches:all'], branchesPayload);
       emitL3(io, ['departments:all'], departmentsPayload);
+      emitL3(io, ['tickets:all'], ticketsPayload);
+      emitL3(io, ['tickets:monthly-summary'], monthlyTicketsSummaryPayload);
     });
 
     socket.on("disconnect", () => {
@@ -632,7 +650,14 @@ export function emitTicketActivityUpdate(io: Server, eventList: string[], data: 
 }
 
 
-export function emitTicketCreatedEvent(io: Server, userId: string, eventList: string[], data: any) {
+export async function emitTicketCreatedEvent(io: Server, userId: string, eventList: string[], data: any) {
+  const totalTickets = await getTotalTicketsModel();
+      const ticketsPayload = {
+        success: true,
+        data: totalTickets,
+        message: "Total tickets retrieved successfully"
+      };
+  emitL3(mainSocketServer, ['tickets:all'], ticketsPayload);
   for (const event of eventList) {
     console.log("Emitting to created tickets room:", event);
     io.to(['tickets:l0', 'tickets:l1']).emit(event, data);
@@ -662,3 +687,14 @@ export async function pushUserListUpdateToAdminDashboard(){
   };
   emitL3(mainSocketServer, ['users:all'], allUsers);
 }
+
+// export async function pushUserListUpdateToAdminDashboard(){
+  
+//   const totalTickets = await getTotalTicketsModel();
+//       const ticketsPayload = {
+//         success: true,
+//         data: totalTickets,
+//         message: "Total tickets retrieved successfully"
+//       };
+//   emitL3(mainSocketServer, ['tickets:all'], ticketsPayload);
+// }
