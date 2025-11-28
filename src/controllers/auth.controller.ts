@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import {
+  getFormatedAuthUsersModel,
   getFormatedUsersModel,
   getUsersModel,
   insertUserModel,
@@ -7,61 +8,78 @@ import {
 } from "../models/users.model";
 
 import { Client, Attribute, Change } from "ldapts";
-import { db } from "../db";
+import { db, redisClient } from "../db";
 import { parseLDAPDN } from "../utils/ldap";
-import { generateUserToken } from "../middlewares/jwt.utils";
+import {
+  generateUserRefreshToken,
+  generateUserToken,
+} from "../middlewares/jwt.utils";
 import { pushUserListUpdateToAdminDashboard } from "../websockets/ticket.socket";
 import { appLogger } from "../utils/logger";
+import { get } from "http";
 
 export async function login(req: Request, res: Response) {
-  if (req.body.username === process.env.ADMIN_USERNAME && req.body.password === process.env.SERVICE_DESK_PASSWORD) {
-    const user = await db.query(
-      "SELECT * FROM users WHERE username = $1",
-      [req.body.username]
-    );
+  if (
+    req.body.username === process.env.ADMIN_USERNAME &&
+    req.body.password === process.env.SERVICE_DESK_PASSWORD
+  ) {
+    const user = await db.query("SELECT * FROM users WHERE username = $1", [
+      req.body.username,
+    ]);
     if (user.rows.length === 0) {
-      return res.status(401).json({ message: "Service Desk user not found", status: 'error' });
+      return res
+        .status(401)
+        .json({ message: "Service Desk user not found", status: "error" });
     }
     const token = generateUserToken({
       email: req.body.username,
       id: user.rows[0].id,
     });
-    return res.status(200).json({ 
-      message: "Login successful", 
+    const refreshToken = generateUserRefreshToken();
+    return res.status(200).json({
+      message: "Login successful",
       data: {
         user: user.rows[0],
-        token
-      }
-      , status: 'success'});
+        token,
+        refreshToken,
+      },
+      status: "success",
+    });
   }
   try {
     const ldapUser: any = await ldapAuthenticate(req, res);
-    
- 
+
     if (!ldapUser || !ldapUser.dn) {
-      const {errorCode, traceId} =  appLogger.error('LDAP_AUTHENTICATION_FAILED', { username: req.body.username }, ldapUser);
-      return res.status(401).json({ message: "Authentication failed", errorCode, traceId, status: 'error' });
+      const { errorCode, traceId } = appLogger.error(
+        "LDAP_AUTHENTICATION_FAILED",
+        { username: req.body.username },
+        ldapUser
+      );
+      return res.status(401).json({
+        message: "Authentication failed",
+        errorCode,
+        traceId,
+        status: "error",
+      });
     }
-    
-    
+
     // Parse LDAP DN to get user information
     let payload = parseLDAPDN(ldapUser.dn);
     payload.branch = ldapUser.physicalDeliveryOfficeName || payload.branch;
-    const userEmail = ldapUser.mail || ldapUser.userPrincipalName || '';
-    
+    const userEmail = ldapUser.mail || ldapUser.userPrincipalName || "";
+
     // Check if user exists in database
     const existingUserResult = await db.query(
       "SELECT * FROM users WHERE email = $1",
       [userEmail]
     );
 
-    
     let dbUser;
     if (existingUserResult.rows.length === 0) {
       // User doesn't exist, create new user
       let departmentId = null;
       let branchId = null;
-      
+
       // Find department ID by matching department name (case-insensitive)
       if (payload.department) {
         const departmentResult = await db.query(
@@ -71,10 +89,9 @@ export async function login(req: Request, res: Response) {
         // meaning department exists
         if (departmentResult.rows.length > 0) {
           departmentId = departmentResult.rows[0].id;
-        }
-        else {
+        } else {
           // create new department
-          const newDeptResult =  await db.query(
+          const newDeptResult = await db.query(
             `INSERT INTO departments (name) VALUES ($1) RETURNING *`,
             [payload.department]
           );
@@ -100,79 +117,153 @@ export async function login(req: Request, res: Response) {
           branchId = newBranchResult.rows[0].id;
         }
       }
-      
+
       // Create new user
       const newUserResult = await db.query(
         `INSERT INTO users (name, email, username, role, department_id, branch_id) 
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [payload.name, userEmail, req.body.username, '0', departmentId, branchId]
+        [
+          payload.name,
+          userEmail,
+          req.body.username,
+          "0",
+          departmentId,
+          branchId,
+        ]
       );
-      await pushUserListUpdateToAdminDashboard()
-      
+      await pushUserListUpdateToAdminDashboard();
+
       dbUser = newUserResult.rows[0];
     } else {
       // User exists, use existing user data
       dbUser = existingUserResult.rows[0];
     }
-    
+    const formattedUser = await getFormatedAuthUsersModel(dbUser.id);
+
     // Fetch user with department data (replace department_id with actual department object)
-    const userWithDeptResult = await db.query(`
-      SELECT 
-        u.*,
-        d.id as department_id,
-        d.name as department_name,
-        d.head_id as department_head_id,
-        b.id as branch_id,
-        b.name as branch_name,
-        b.head_id as branch_head_id
-      FROM users u
-      LEFT JOIN departments d ON u.department_id = d.id
-      LEFT JOIN branches b ON u.branch_id = b.id
-      WHERE u.id = $1
-    `, [dbUser.id]);
-    const userWithDept = userWithDeptResult.rows[0];
-    
-    // Format user object with department data
-    const formattedUser = {
-      id: userWithDept.id,
-      name: userWithDept.name,
-      email: userWithDept.email,
-      onboarded: userWithDept.onboarded,
-      role: userWithDept.role,
-      created_at: userWithDept.created_at,
-      updated_at: userWithDept.updated_at,
-      department: userWithDept.department_id ? {
-        id: userWithDept.department_id,
-        name: userWithDept.department_name,
-        head_id: userWithDept.department_head_id
-      } : null,
-      branch: userWithDept.branch_id ? {
-        id: userWithDept.branch_id,
-        name: userWithDept.branch_name,
-        head_id: userWithDept.branch_head_id
-      } : null,
-      // ldapUser
-    };
-    
+    // const userWithDeptResult = await db.query(
+    //   `
+    //   SELECT
+    //     u.*,
+    //     d.id as department_id,
+    //     d.name as department_name,
+    //     d.head_id as department_head_id,
+    //     b.id as branch_id,
+    //     b.name as branch_name,
+    //     b.head_id as branch_head_id
+    //   FROM users u
+    //   LEFT JOIN departments d ON u.department_id = d.id
+    //   LEFT JOIN branches b ON u.branch_id = b.id
+    //   WHERE u.id = $1
+    // `,
+    //   [dbUser.id]
+    // );
+    // const userWithDept = userWithDeptResult.rows[0];
+
+    // // Format user object with department data
+    // const formattedUser = {
+    //   id: userWithDept.id,
+    //   name: userWithDept.name,
+    //   email: userWithDept.email,
+    //   onboarded: userWithDept.onboarded,
+    //   role: userWithDept.role,
+    //   created_at: userWithDept.created_at,
+    //   updated_at: userWithDept.updated_at,
+    //   department: userWithDept.department_id
+    //     ? {
+    //         id: userWithDept.department_id,
+    //         name: userWithDept.department_name,
+    //         head_id: userWithDept.department_head_id,
+    //       }
+    //     : null,
+    //   branch: userWithDept.branch_id
+    //     ? {
+    //         id: userWithDept.branch_id,
+    //         name: userWithDept.branch_name,
+    //         head_id: userWithDept.branch_head_id,
+    //       }
+    //     : null,
+    //   // ldapUser
+    // };
+
     // Generate JWT token
     const token = generateUserToken({
       id: dbUser.id,
-      email: dbUser.email
+      email: dbUser.email,
     });
-    
+    const refreshToken = generateUserRefreshToken();
+
+    // add refresh token to redis
+    await redisClient.set(
+      `refreshToken:${dbUser.id}`,
+      refreshToken,
+      "EX",
+      process.env.NODE_ENV === "production" ? 86400 : 420 // 1 day in production, 7 mins in development
+    );
+    // console.log(
+    //   "---------------------------------------------------------------------"
+    // );
+    // console.log(
+    //   `refreshToken:${await redisClient.get(`refreshToken:${dbUser.id}`)}`
+    // );
+    // console.log({ refreshToken });
+    // console.log(
+    //   "---------------------------------------------------------------------"
+    // );
+
     // Return success response with user data and token
-    res.status(200).json({ 
-      message: "Login successful", 
+    res.status(200).json({
+      message: "Login successful",
       data: {
         user: formattedUser,
         token: token,
-      }, 
-      status: 'success' 
+        refreshToken: refreshToken,
+      },
+      status: "success",
     });
-    
   } catch (err) {
-    const {errorCode, traceId} =  appLogger.error('LDAP_AUTHENTICATION_FAILED', { username: req.body.username }, err as any);
-    res.status(500).json({ message: "Authentication error", errorCode, traceId, status: 'error' });
+    const { errorCode, traceId } = appLogger.error(
+      "LDAP_AUTHENTICATION_FAILED",
+      { username: req.body.username },
+      err as any
+    );
+    res.status(500).json({
+      message: "Authentication error",
+      errorCode,
+      traceId,
+      status: "error",
+    });
+  }
+}
+
+export async function refreshToken(req: Request, res: Response) {
+  const { refreshToken, userId } = req.body;
+  console.log({ refreshToken, userId });
+  if (!refreshToken) {
+    return res
+      .status(400)
+      .json({ message: "Refresh token is required", status: "error" });
+  }
+  try {
+    const storedRefreshToken = await redisClient.get(`refreshToken:${userId}`);
+    console.log("-----------------------------------------------------");
+    console.log({ refreshToken });
+    console.log({ storedRefreshToken });
+    console.log("-----------------------------------------------------");
+    if (storedRefreshToken !== refreshToken) {
+      throw new Error("Refresh token not found or does not match");
+    }
+    const user = await getFormatedAuthUsersModel(userId);
+    const newToken = generateUserToken({ id: userId, email: user.email });
+    res.status(200).json({
+      message: "Token refreshed successfully",
+      data: { token: newToken },
+      status: "success",
+    });
+  } catch (err) {
+    res
+      .status(401)
+      .json({ message: "Invalid refresh token", error: err, status: "error" });
   }
 }
 
@@ -195,7 +286,7 @@ export async function updateUser(req: Request, res: Response) {
   const { id } = req.params;
   const { name, username, role, departmentId } = req.body;
   try {
-    const result = await updateUserModel(id, {...req.body});
+    const result = await updateUserModel(id, { ...req.body });
     if (result.rowCount === 0) {
       return res.status(404).json({ message: "User not found" });
     }
