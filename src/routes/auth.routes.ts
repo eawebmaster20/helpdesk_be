@@ -3,7 +3,11 @@ import {
   authenticate,
   authenticateSSO,
 } from "../middlewares/authenticate.utils";
-import { login, updateADUserDepartment } from "../controllers/auth.controller";
+import {
+  login,
+  refreshToken,
+  updateADUserDepartment,
+} from "../controllers/auth.controller";
 // import { ldapAuthenticate } from "../controllers/auth.controller";
 
 const router = Router();
@@ -23,6 +27,7 @@ router.post("/sso/logout", (req: Request, res: Response) => {
 });
 
 router.post("/login", login);
+router.post("/refresh-token", refreshToken);
 router.post("/update-profile", updateADUserDepartment);
 router.get("/sso", authenticateSSO);
 // router.post("/ldap", ldapAuthenticate);
