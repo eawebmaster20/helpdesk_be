@@ -55,7 +55,7 @@ export const generateUserToken = (
   }
 
   return jwt.sign(payload as string | Buffer | object, secret, {
-    expiresIn: "7d",
+    expiresIn: "5m",
   });
 };
 
