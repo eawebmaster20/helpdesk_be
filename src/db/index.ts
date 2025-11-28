@@ -2,6 +2,13 @@ import { Pool } from "pg";
 import dotenv from "dotenv";
 import path from "path/win32";
 import fs from "fs";
+import { Redis } from "ioredis";
+
+export const redisClient = new Redis({
+  host: process.env.REDIS_HOST, // use service name defined in docker-compose.yml
+  port: 6379,
+  // password: 'yourPassword'   // if you enabled auth
+});
 
 dotenv.config();
 
@@ -24,39 +31,35 @@ export const db = new Pool({
 })();
 
 export async function initializeDatabase(): Promise<void> {
-  const schema = fs.readFileSync(
-    path.join(__dirname, "schema.sql"),
-    "utf-8"
-  );
+  const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf-8");
   try {
     await db.query(schema);
-    
+
     // create default branch (check if exists first)
-    let branch = await db.query(
-      `SELECT * FROM branches WHERE name = $1`,
-      [process.env.DEFAULT_BRANCH_NAME || "Head Office"]
-    );
-    
+    let branch = await db.query(`SELECT * FROM branches WHERE name = $1`, [
+      process.env.DEFAULT_BRANCH_NAME || "Head Office",
+    ]);
+
     if (branch.rows.length === 0) {
       branch = await db.query(
         `INSERT INTO branches (name) VALUES ($1) RETURNING *`,
         [process.env.DEFAULT_BRANCH_NAME || "Head Office"]
       );
     }
-    
+
     // create default department (check if exists first)
     let department = await db.query(
       `SELECT * FROM departments WHERE name = $1`,
       [process.env.DEFAULT_DEPARTMENT_NAME || "IT"]
     );
-    
+
     if (department.rows.length === 0) {
       department = await db.query(
         `INSERT INTO departments (name) VALUES ($1) RETURNING *`,
         [process.env.DEFAULT_DEPARTMENT_NAME || "IT"]
       );
     }
-    
+
     // set admin account (email has unique constraint, so ON CONFLICT works here)
     await db.query(
       `INSERT INTO users (name, email, username, role, department_id, branch_id, onboarded) VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -68,7 +71,7 @@ export async function initializeDatabase(): Promise<void> {
         process.env.ADMIN_ROLE || "3",
         department.rows[0].id,
         branch.rows[0].id,
-        process.env.ADMIN_ONBOARDED || true
+        process.env.ADMIN_ONBOARDED || true,
       ]
     );
     console.log("Database tables ensured.");
