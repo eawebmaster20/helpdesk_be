@@ -133,7 +133,7 @@ export async function addSLACompliance(ticket: FormattedTicket): Promise<void> {
 }
 
  async function is_response_met(ticket: FormattedTicket): Promise<boolean> {
-  if (ticket.status === 'closed' || ticket.status === 'resolved') {
+  if (ticket?.status?.name.toLocaleLowerCase() === 'closed' || ticket?.status?.name.toLocaleLowerCase() === 'resolved') {
     return true;
   }
   const responseTimeInMinutes = ticket.sla!.response_time_hours * 60;
@@ -142,7 +142,7 @@ export async function addSLACompliance(ticket: FormattedTicket): Promise<void> {
 }
 
   async function is_resolution_met(ticket: FormattedTicket): Promise<boolean> {
-  if (ticket.status === 'closed' || ticket.status === 'resolved') {
+  if (ticket?.status?.name.toLocaleLowerCase() === 'closed' || ticket?.status?.name.toLocaleLowerCase() === 'resolved') {
     return true;
   }
   const resolutionTimeInMinutes = ticket.sla!.resolution_time_hours * 60;
