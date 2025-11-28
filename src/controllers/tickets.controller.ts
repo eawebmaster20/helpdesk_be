@@ -7,6 +7,8 @@ import {
   getTicketActivitiesModel,
   getFormatedTicketsIdModel,
   closeTicketModel,
+  getFormatedTicketsModel,
+  getTicketSummaryModel,
 } from "../models/ticket.model";
 import { Request, Response } from "express";
 import { db } from "../db";
@@ -15,17 +17,18 @@ import { emitTicketActivityUpdate, emitTicketCreatedEvent, emitTicketUpdate, emi
 import { sendEmail } from "../utils/bull-email";
 import { applySLAPolicyToTicket } from "./sla.controller";
 import { addSLACompliance } from "../models/sla.model";
+import { getAllStatusesModel } from "../models/statuses.model";
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
-  const { title, userId, description, status, priorityId, categoryId, assigneeId } = req.body;
+  const { title, userId, description, statusId, priorityId, categoryId, assigneeId } = req.body;
   try {
     const unUpdatedTicket = await getFormatedTicketsIdModel(id);
     const result = await updateTicketModel(
       id,
       title,
       description,
-      status,
+      statusId,
       priorityId,
       categoryId,
       assigneeId
@@ -43,8 +46,8 @@ export async function updateTicket(req: Request, res: Response) {
     if (description && description !== unUpdatedTicket.description) {
       action += `changed description from "${description}" to "${updatedTicket.description}". `;
     }
-    if (status && status !== unUpdatedTicket.status) {
-      action += `changed status from "${unUpdatedTicket.status}" to "${updatedTicket.status}". `;
+    if (statusId && statusId !== unUpdatedTicket.status?.id) {
+      action += `changed status from "${unUpdatedTicket.status?.name}" to "${updatedTicket.status?.name}". `;
     }
     if ((priorityId && priorityId !== unUpdatedTicket.priority?.id) || (categoryId && categoryId !== unUpdatedTicket.category?.id)) {
       if (priorityId && !categoryId) {
@@ -86,7 +89,7 @@ export async function updateTicket(req: Request, res: Response) {
       message: "A ticket has been updated",
       success: true
     });
-    if (updatedTicket.status === 'Resolved') {
+    if (updatedTicket?.status?.name === 'Resolved') {
       sendEmail('status_update', usersToEmail, `There is an update on your ticket ${updatedTicket.ticket_number}`, updatedTicket);
     }
   } catch (err) {
@@ -185,7 +188,7 @@ export async function addTicketAttachment(req: Request, res: Response) {
 export async function assignTicket(req: Request, res: Response) {
   const { id } = req.params;
   const auto = process.env.AUTO_ASSIGN_TICKETS;
-  const { assigneeId, userId } = req.body;
+  const { assigneeId, userId, statusId } = req.body;
   if (auto === 'true') {
     return res.status(501).json({ message: "Auto-assign not implemented" });
   }
@@ -196,6 +199,9 @@ export async function assignTicket(req: Request, res: Response) {
   }
   if (!userId) {
     return res.status(400).json({ message: "userId is required for activity tracking" });
+  }
+  if(!statusId) {
+    return res.status(400).json({ message: "statusId is required for status transition" });
   }
   try {
     // Get assignee name for activity description
@@ -209,7 +215,7 @@ export async function assignTicket(req: Request, res: Response) {
     );
     const createdBy = createdByResult.rows[0]?.created_by;
     
-    const result = await assignTicketModel(id, assigneeId);
+    const result = await assignTicketModel(id, assigneeId, statusId);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Ticket not found" });
     }
@@ -304,7 +310,7 @@ export async function transitionTicket(req: Request, res: Response) {
 
 export async function closeTicket(req: Request, res: Response) {
   const { id } = req.params;
-  const { userId, reason } = req.body;
+  const { userId, reason, statusId } = req.body;
   if (!userId) {
     return res.status(400).json({ message: "userId is required for activity tracking" });
   }
@@ -313,7 +319,7 @@ export async function closeTicket(req: Request, res: Response) {
     if (!ticketResult) {
       return res.status(404).json({ message: "Ticket not found" });
     }
-    await closeTicketModel(id);
+    await closeTicketModel(id, statusId);
     // Add activity tracking
     const action = reason? `closed the ticket with a Reason` : 'closed the ticket';
     await addTicketActivityModel(id, 'status', userId, action, reason);
@@ -338,67 +344,7 @@ export async function closeTicket(req: Request, res: Response) {
 
 export async function getTickets(req: Request, res: Response) {
   try {
-    const result = await db.query(`
-      SELECT 
-        t.*,
-        d.name as department_name,
-        d.id as department_id,
-        c.name as category_name,
-        c.description as category_description,
-        c.id as category_id,
-        u_creator.name as created_by_name,
-        u_creator.email as created_by_email,
-        u_owner.name as owned_by_name,
-        u_owner.email as owned_by_email,
-        u_owner.id as owned_by_id,
-        u_assignee.name as assignee_name,
-        u_assignee.email as assignee_email,
-        u_assignee.id as assignee_id
-      FROM tickets t
-      LEFT JOIN departments d ON t.department_id = d.id
-      LEFT JOIN categories c ON t.category_id = c.id
-      LEFT JOIN users u_creator ON t.created_by = u_creator.id
-      LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
-      LEFT JOIN users u_owner ON t.created_for = u_owner.id
-      ORDER BY t.created_at DESC
-    `);
-    
-    // Transform the data to include nested objects
-    const transformedData = result.rows.map(row => ({
-      id: row.id,
-      ticket_number: row.ticket_number,
-      title: row.title,
-      description: row.description,
-      status: row.status,
-      priority: row.priority,
-      attachments: row.attachments,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      department: row.department_id ? {
-        id: row.department_id,
-        name: row.department_name
-      } : null,
-      category: row.category_id ? {
-        id: row.category_id,
-        name: row.category_name,
-        description: row.category_description
-      } : null,
-      created_by: {
-        id: row.created_by,
-        name: row.created_by_name,
-        email: row.created_by_email
-      },
-      created_for: row.owned_by_id ? {
-        id: row.owned_by_id,
-        name: row.owned_by_name,
-        email: row.owned_by_email
-      } : null,
-      assignee: row.assignee_id ? {
-        id: row.assignee_id,
-        name: row.assignee_name,
-        email: row.assignee_email
-      } : null
-    }));
+    const transformedData = await getFormatedTicketsModel(); 
     
     res.json({
       message: '',
@@ -510,8 +456,10 @@ export async function createTicket(req: Request, res: Response) {
     
     // Create the ticket with the generated ticket number
     console.log('creating ticket with number:', ticketNumber);
+    const statuses = await getAllStatusesModel();
+    const defaultStatus = statuses.find(status => status.name.toLowerCase() === 'new');
     const result = await db.query(
-      `INSERT INTO tickets (ticket_number, title, description, department_id, branch_id, created_by, created_for, status, priority_id, category_id) 
+      `INSERT INTO tickets (ticket_number, title, description, department_id, branch_id, created_by, created_for, status_id, priority_id, category_id) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [
         ticketNumber, 
@@ -521,7 +469,7 @@ export async function createTicket(req: Request, res: Response) {
         branchId && branchId.trim() !== '' ? branchId : null,
         createdBy, 
         createdFor && createdFor.trim() !== '' ? createdFor : null,
-        "New", 
+        defaultStatus ? defaultStatus.id : null, 
         priority, 
         categoryId && categoryId.trim() !== '' ? categoryId : null
       ]
@@ -543,11 +491,11 @@ export async function createTicket(req: Request, res: Response) {
     const usersToNotify = new Set<string>();
     const usersToEmail:string[] = []
     usersToNotify.add(`${createdBy}:new`);
-    usersToEmail.push((newTicket.created_by && newTicket.created_by.email) ? newTicket.created_by.email : '');
+    usersToEmail.push((newTicket.created_by && newTicket.created_by.email) ? newTicket.created_by.id : '');
     if (createdFor) {
       usersToNotify.add(`${createdFor}:new`);
       if (newTicket.created_for && newTicket.created_for.email) {
-        usersToEmail.push(newTicket.created_for.email);
+        usersToEmail.push(newTicket.created_for.id);
       }
     }
     usersToNotify.add(`tickets:new`);
@@ -667,4 +615,11 @@ export async function getTicketActivities(req: Request, res: Response) {
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
+}
+
+export async function getMonthlyTicketSummary() {
+  // ticketQtySurvey: [{year: number, month: number, totalTickets: number, closedTickets: number, openTickets: number }]
+  
+  const ticketSummary = await getTicketSummaryModel()
+  return ticketSummary.rows;
 }
