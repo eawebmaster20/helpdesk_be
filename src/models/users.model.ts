@@ -4,7 +4,7 @@ export async function getUsersModel() {
   return db.query("SELECT * FROM users ORDER BY created_at DESC");
 }
 
-export async function getFormatedUsersModel(){
+export async function getFormatedUsersModel() {
   const users = await db.query(`
     SELECT
         u.*,
@@ -14,23 +14,23 @@ export async function getFormatedUsersModel(){
       LEFT JOIN departments d ON u.department_id = d.id
       LEFT JOIN branches b ON u.branch_id = b.id
       ORDER BY u.created_at DESC
-    `)
+    `);
 
-  return users.rows.map(user => ({
+  return users.rows.map((user) => ({
     id: user.id,
     name: user.name,
     email: user.email,
     role: user.role,
     department: {
       id: user.department_id,
-      name: user.department_name
+      name: user.department_name,
     },
     branch: {
       id: user.branch_id,
-      name: user.branch_name
+      name: user.branch_name,
     },
     createdAt: user.created_at,
-    updatedAt: user.updated_at
+    updatedAt: user.updated_at,
   }));
 }
 
@@ -39,11 +39,16 @@ export async function getUserByEmail(email: string) {
 }
 
 export async function getUserGroupModel(roles: string[]) {
-  return db.query("SELECT * FROM users WHERE role = ANY($1) ORDER BY created_at DESC", [roles]);
+  return db.query(
+    "SELECT * FROM users WHERE role = ANY($1) ORDER BY created_at DESC",
+    [roles]
+  );
 }
 
 export async function getFormattedUsersByEmailModel(emails: string[]) {
-  const users = await db.query("SELECT * FROM users WHERE id = ANY($1)", [emails]);
+  const users = await db.query("SELECT * FROM users WHERE id = ANY($1)", [
+    emails,
+  ]);
   if (users.rowCount === 0) {
     return null;
   }
@@ -90,7 +95,7 @@ export async function updateUserModel(
     onboarded?: boolean;
   }
 ) {
-  const setClauses: string[] = ['updated_at = NOW()'];
+  const setClauses: string[] = ["updated_at = NOW()"];
   const values: any[] = [];
   let paramIndex = 1;
 
@@ -126,7 +131,57 @@ export async function updateUserModel(
   values.push(id);
 
   return db.query(
-    `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+    `UPDATE users SET ${setClauses.join(
+      ", "
+    )} WHERE id = $${paramIndex} RETURNING *`,
     values
   );
+}
+
+export async function getFormatedAuthUsersModel(userIds: string) {
+  const user = await db.query(
+    `
+      SELECT 
+        u.*,
+        d.id as department_id,
+        d.name as department_name,
+        d.head_id as department_head_id,
+        b.id as branch_id,
+        b.name as branch_name,
+        b.head_id as branch_head_id
+      FROM users u
+      LEFT JOIN departments d ON u.department_id = d.id
+      LEFT JOIN branches b ON u.branch_id = b.id
+      WHERE u.id = $1
+    `,
+    [userIds]
+  );
+  const userWithDept = user.rows[0];
+
+  // Format user object with department data
+  const formattedUser = {
+    id: userWithDept.id,
+    name: userWithDept.name,
+    email: userWithDept.email,
+    onboarded: userWithDept.onboarded,
+    role: userWithDept.role,
+    created_at: userWithDept.created_at,
+    updated_at: userWithDept.updated_at,
+    department: userWithDept.department_id
+      ? {
+          id: userWithDept.department_id,
+          name: userWithDept.department_name,
+          head_id: userWithDept.department_head_id,
+        }
+      : null,
+    branch: userWithDept.branch_id
+      ? {
+          id: userWithDept.branch_id,
+          name: userWithDept.branch_name,
+          head_id: userWithDept.branch_head_id,
+        }
+      : null,
+    // ldapUser
+  };
+  return formattedUser;
 }
