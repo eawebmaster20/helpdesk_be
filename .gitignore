@@ -3,4 +3,5 @@ docs
 dist
 .github
 .env
+.env-old
 template.html
