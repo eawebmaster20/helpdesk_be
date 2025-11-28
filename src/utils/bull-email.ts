@@ -228,6 +228,6 @@ export const sendEmail = async (
       });
     }
   } catch (error) {
-    console.error("Failed to add email to queue:", error);
+    console.error("Failed to add email to queue last:", error);
   }
 };
