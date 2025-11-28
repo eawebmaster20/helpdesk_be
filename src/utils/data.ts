@@ -33,7 +33,7 @@ export const getTicketCreatedHtmlContent = (ticket: FormattedTicket) => `
                                             • <strong>Ticket ID:</strong> #${ticket.ticket_number}<br>
                                             • <strong>Category:</strong> ${ticket.category?.name}<br>
                                             • <strong>Priority:</strong> ${ticket.priority?.name}<br>
-                                            • <strong>Status:</strong> ${ticket.status}<br>
+                                            • <strong>Status:</strong> ${ticket.status?.name}<br>
                                             • <strong>Last Updated:</strong> ${ticket.updated_at.toLocaleString()}
                                         </p>
                                     </td>
