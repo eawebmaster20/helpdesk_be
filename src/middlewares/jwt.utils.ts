@@ -55,7 +55,20 @@ export const generateUserToken = (
   }
 
   return jwt.sign(payload as string | Buffer | object, secret, {
-    expiresIn: "5m",
+    expiresIn: process.env.NODE_ENV === "production" ? "15m" : "5m",
+  });
+};
+
+export const generateUserRefreshToken = (): string => {
+  const secret = process.env.JWT_REFRESH_SECRET;
+  if (!secret) {
+    throw new Error(
+      "JWT_REFRESH_SECRET is not defined in environment variables"
+    );
+  }
+
+  return jwt.sign({}, secret, {
+    expiresIn: process.env.NODE_ENV === "production" ? "1d" : "7m",
   });
 };
 
@@ -66,6 +79,17 @@ export const verifyUserToken = (token: string): UserJwtPayload => {
   }
 
   return jwt.verify(token, secret) as UserJwtPayload;
+};
+
+export const verifyUserRefreshToken = (token: string): void => {
+  const secret = process.env.JWT_REFRESH_SECRET;
+  if (!secret) {
+    throw new Error(
+      "JWT_REFRESH_SECRET is not defined in environment variables"
+    );
+  }
+
+  jwt.verify(token, secret);
 };
 
 // Generate secure random tokens
