@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS sla_policies (
 CREATE TABLE IF NOT EXISTS ticket_statuses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
+  css_class VARCHAR(50),
   enabled BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
