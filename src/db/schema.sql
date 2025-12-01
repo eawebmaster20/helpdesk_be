@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS kb_articles (
   content TEXT NOT NULL,
   tags VARCHAR(255)[],
   created_by UUID NOT NULL,
+  guid VARCHAR(100) UNIQUE NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
