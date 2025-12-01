@@ -50,12 +50,13 @@ export const generateUserToken = (
   payload: Omit<UserJwtPayload, "iat" | "exp">
 ): string => {
   const secret = process.env.JWT_SECRET;
+  const expiresIn = process.env.JWT_EXPIRES_IN || "1d";
   if (!secret) {
     throw new Error("JWT_SECRET is not defined in environment variables");
   }
 
-  return jwt.sign(payload as string | Buffer | object, secret, {
-    expiresIn: process.env.NODE_ENV === "production" ? "15m" : "5m",
+  return jwt.sign(payload , secret, {
+    expiresIn: expiresIn as jwt.SignOptions["expiresIn"],
   });
 };
 
