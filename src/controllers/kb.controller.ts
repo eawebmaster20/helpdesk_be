@@ -5,6 +5,7 @@ import {
   createKBArticleModel,
 } from "../models/kb.model";
 import { Request, Response } from "express";
+import { v4 as uuidv4 } from "uuid";
 
 export async function searchKBArticles(req: Request, res: Response) {
   console.log("request received for Knowledge Base search");
@@ -48,7 +49,8 @@ export async function createKBArticle(req: Request, res: Response) {
       .json({ message: "title, body, and createdBy are required" });
   }
   try {
-    const result = await createKBArticleModel(title, body, tags, createdBy);
+    const guid = uuidv4();
+    const result = await createKBArticleModel(title, body, tags, createdBy, guid);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });

@@ -36,10 +36,11 @@ export async function createKBArticleModel(
   title: string,
   content: string,
   tags: string[],
-  createdBy: string
+  createdBy: string,
+  guid: string
 ) {
   return db.query(
-    `INSERT INTO kb_articles (title, content, tags, created_by) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [title, content, tags, createdBy]
+    `INSERT INTO kb_articles (title, content, tags, created_by, guid) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [title, content, tags, createdBy, guid]
   );
 }
