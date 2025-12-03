@@ -1,8 +1,6 @@
 import { Server, Socket } from "socket.io";
-import { db } from "../db";
 import { verifyUserToken } from "../middlewares/jwt.utils";
 import { 
-  addTicketActivityModel, 
   getFormatedL2TicketsModel, 
   getFormatedTicketsModel, 
   getTicketActivitiesModel, 
@@ -10,12 +8,12 @@ import {
 } from "../models/ticket.model";
 
 import { io as mainSocketServer} from "../index";
-import { getFormatedUsersModel, getUsersModel } from "../models/users.model";
+import { getFormatedUsersModel } from "../models/users.model";
 import { getFormatedBranchesModel } from "../models/branches.model";
 import { getFormatedDepartmentsModel } from "../models/departments.model";
-import { tickets } from "../storage/memory";
-import { emit } from "process";
 import { getMonthlyTicketSummary } from "../controllers/tickets.controller";
+import { redisClient } from "../db";
+import { sendPushNotification, subscribeToPushNotifications } from "../utils/push-notification";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -58,6 +56,9 @@ export function newSetupHandlers(io: Server) {
           data: userTickets,
           message: "Your ticket list has been retrieved successfully"
         });
+        // const subscription = socket.userId + ':ticket:updates';
+        // await redisClient.lpush("push_subscriptions", subscription);
+        // // sendPushNotification('push notification test', );
       }
     });
 
@@ -78,13 +79,15 @@ export function newSetupHandlers(io: Server) {
       });
     });
 
-    socket.on("user_l2", async (callback) => {
+    socket.on("user_l2", async (payload, callback) => {
       socket.join(`tickets:l2`);
+      const subscribed = await subscribeToPushNotifications(payload);
       console.log(`User ${socket.userEmail} joined room tickets:l2`);
       const tickets = await getFormatedL2TicketsModel(socket.userId!);
       callback({
         success: true,
         data: tickets,
+        pushNotifications: subscribed,
         message: "Subscribed to L2 ticket list successfully"
       });
     });

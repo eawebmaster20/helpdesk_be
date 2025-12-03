@@ -23,6 +23,8 @@ import { db, initializeDatabase, resetDatabase } from "./db/index";
 import { newSetupHandlers } from "./websockets/ticket.socket";
 import { addEmailToQueue } from "./utils/bull-email";
 import { logRequest } from "./utils/logger";
+import { sendPushNotification, setupPushNotifications, subscribeToPushNotifications } from "./utils/push-notification";
+import { send } from "process";
 
 const app: Application = express();
 const httpServer = createServer(app);
@@ -69,6 +71,9 @@ app.use("/api/v1/departments", departmentsRoutes);
 app.use("/api/v1/branches", branchesRoutes);
 app.use("/api/v1/users", usersRoutes);
 app.use("/api/v1/slas", slasRoutes);
+app.post("/api/v1/push-notification/subscribe", subscribeToPushNotifications);
+app.post("/api/v1/push-notification/send", sendPushNotification);
+app.post("/api/v1/push-notification/unsubscribe", sendPushNotification);
 app.get("/init-db", async (req: Request, res: Response) => {
   try {
     await initializeDatabase();
@@ -190,6 +195,7 @@ const startServer = async () => {
     // Setup WebSocket handlers
     // setupTicketSocketHandlers(io);
     newSetupHandlers(io);
+    setupPushNotifications()
 
     httpServer.listen(PORT, () => {
       console.log("\nServer is running!");
