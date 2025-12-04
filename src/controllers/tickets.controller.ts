@@ -9,6 +9,11 @@ import {
   closeTicketModel,
   getFormatedTicketsModel,
   getTicketSummaryModel,
+  getTotalTicketStatusModel,
+  getTotalTicketCategorySummaryModel,
+  getMonthlyTicketCategoryModel,
+  getTicketsPerBranchSummaryModel,
+  getLastXTicketsByDateUpdatedModel,
 } from "../models/ticket.model";
 import { Request, Response } from "express";
 import { db } from "../db";
@@ -618,8 +623,56 @@ export async function getTicketActivities(req: Request, res: Response) {
 }
 
 export async function getMonthlyTicketSummary() {
-  // ticketQtySurvey: [{year: number, month: number, totalTickets: number, closedTickets: number, openTickets: number }]
-  
   const ticketSummary = await getTicketSummaryModel()
   return ticketSummary.rows;
+}
+
+export async function getTotalTicketCategorySummary() {
+  const ticketSummary = await getTotalTicketCategorySummaryModel();
+  return ticketSummary.rows;
+}
+
+export async function getTicketCategoryMonthlySummary() {
+  const ticketsByCategory = await getMonthlyTicketCategoryModel();
+  const formatedResult: { [key: string]: number[] } = {};
+  ticketsByCategory.rows.forEach((row) => {
+    const monthIndex = new Date(row.month + '-01').getMonth(); // Get month index (0-11)
+    if (!formatedResult[row.category_name]) {
+      formatedResult[row.category_name] = new Array(12).fill(0); // Initialize array for 12 months
+    }
+    formatedResult[row.category_name][monthIndex] = Number(row.total_tickets);
+  });
+  return Object.entries(formatedResult).map(([name, data]) => ({ name, data }));
+}
+
+export async function getTotalTicketStatusSummary() {
+  const ticketSummary = await getTotalTicketStatusModel();
+  return ticketSummary.rows.map(status => ({
+    id: status.status_id,
+    statusName: status.status_name,
+    totalTickets: Number(status.total_tickets),
+    moreThisMonth: status.more_tickets_for_this_status_this_month
+  }));
+}
+
+export async function getTicketsPerBranchSummary() {
+  const result = await getTicketsPerBranchSummaryModel();
+  return result.rows.map(branch => ({
+    branchId: branch.branch_id,
+    branchName: branch.branch_name,
+    totalBranchTickets: Number(branch.total_tickets),
+    allBranchesTicketTotal: Number(branch.all_branches_ticket_total)
+  }));
+}
+
+export async function getLastXTicketsByDateUpdated(limit: number) {
+  const result = await getLastXTicketsByDateUpdatedModel(limit);
+  return result.rows.map(ticket => ({
+    title: ticket.title,
+    category: ticket.category,
+    priority: ticket.priority_name,
+    status: { name: ticket.status_name, cssClass: ticket.status_css_class },
+    createdBy: ticket.created_by,
+    updatedAt: ticket.updated_at
+  }));
 }
