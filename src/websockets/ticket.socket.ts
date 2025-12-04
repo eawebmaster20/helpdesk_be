@@ -5,17 +5,19 @@ import {
   addTicketActivityModel, 
   getFormatedL2TicketsModel, 
   getFormatedTicketsModel, 
+  getMonthlyTicketCategoryModel, 
   getTicketActivitiesModel, 
   getTotalTicketsModel
 } from "../models/ticket.model";
 
 import { io as mainSocketServer} from "../index";
-import { getFormatedUsersModel, getUsersModel } from "../models/users.model";
+import { getFormatedUsersModel, getTotalUserSummaryPayload, getUsersModel } from "../models/users.model";
 import { getFormatedBranchesModel } from "../models/branches.model";
 import { getFormatedDepartmentsModel } from "../models/departments.model";
 import { tickets } from "../storage/memory";
 import { emit } from "process";
-import { getMonthlyTicketSummary } from "../controllers/tickets.controller";
+import { getLastXTicketsByDateUpdated, getMonthlyTicketSummary, getTicketCategoryMonthlySummary, getTicketsPerBranchSummary, getTotalTicketCategorySummary, getTotalTicketStatusSummary } from "../controllers/tickets.controller";
+import { get } from "http";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -147,11 +149,54 @@ export function newSetupHandlers(io: Server) {
         data: monthlyTicketsSummary,
         message: "Monthly tickets summary retrieved successfully"
       };
+      const totalTicketCategorySummary = await getTotalTicketCategorySummary();
+      const totalTicketCategorySummaryPayload = {
+        success: true,
+        data: totalTicketCategorySummary,
+        message: "Total ticket category summary retrieved successfully"
+      };
+      const totalTicketStatusSummary = await getTotalTicketStatusSummary();
+      const totalTicketStatusSummaryPayload = {
+        success: true,
+        data: totalTicketStatusSummary,
+        message: "Total ticket status summary retrieved successfully"
+      };
+      const totalUserSummary = await getTotalUserSummaryPayload();
+      const totalUserSummaryPayload = {
+        success: true,
+        data: totalUserSummary,
+        message: "Total user summary retrieved successfully"
+      };
+      const ticketsPerBranch = await getTicketsPerBranchSummary();
+      const ticketsPerBranchPayload = {
+        success: true,
+        data: ticketsPerBranch,
+        message: "Tickets per branch summary retrieved successfully"
+      };
+      const last5UpdatedTickets = await getLastXTicketsByDateUpdated(5);
+      const last5UpdatedTicketsPayload = {
+        success: true,
+        data: last5UpdatedTickets,
+        message: "Last 5 updated tickets retrieved successfully"
+      };
+      const monthlyTicketCategorySummary = await getTicketCategoryMonthlySummary();
+      const monthlyTicketCategorySummaryPayload = {
+        success: true,
+        data: monthlyTicketCategorySummary,
+        message: "Monthly ticket category summary retrieved successfully"
+      };
+
       emitL3(io, ['users:all'], payload);
+      emitL3(io, ['users:total-summary'], totalUserSummaryPayload);
       emitL3(io, ['branches:all'], branchesPayload);
       emitL3(io, ['departments:all'], departmentsPayload);
       emitL3(io, ['tickets:all'], ticketsPayload);
       emitL3(io, ['tickets:monthly-summary'], monthlyTicketsSummaryPayload);
+      emitL3(io, ['tickets:total-category-summary'], totalTicketCategorySummaryPayload);
+      emitL3(io, ['tickets:monthly-category-summary'], monthlyTicketCategorySummaryPayload);
+      emitL3(io, ['tickets:total-status-summary'], totalTicketStatusSummaryPayload);
+      emitL3(io, ['tickets:total-per-branch-summary'], ticketsPerBranchPayload);
+      emitL3(io, ['tickets:last-5-updated'], last5UpdatedTicketsPayload);
     });
 
     socket.on("disconnect", () => {
