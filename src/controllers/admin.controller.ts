@@ -91,6 +91,7 @@ export async function updateSLAPolicy(req: Request, res: Response) {
     res.status(500).json({ message: "Database error", error: err });
   }
 }
+
 export async function getCategories(req: Request, res: Response) {
   try {
     const result = await getAllCategories();
@@ -126,4 +127,3 @@ export async function updateCategory(req: Request, res: Response) {
     res.status(500).json({ message: "Database error", error: err });
   }
 }
-// ...add more admin-related controller functions as needed...
