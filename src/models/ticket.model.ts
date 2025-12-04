@@ -741,11 +741,97 @@ export async function getTicketSummaryModel() {
     SELECT 
       EXTRACT(YEAR FROM created_at) AS year,
       EXTRACT(MONTH FROM created_at) AS month,
-      COUNT(*) AS total_tickets,
-      SUM(CASE WHEN status_id = '${closedStatus?.id}' THEN 1 ELSE 0 END) AS closed_tickets,
-      SUM(CASE WHEN status_id != '${closedStatus?.id}' THEN 1 ELSE 0 END) AS open_tickets
+      COUNT(*) AS totalTickets,
+      SUM(CASE WHEN status_id = '${closedStatus?.id}' THEN 1 ELSE 0 END) AS closedTickets,
+      SUM(CASE WHEN status_id != '${closedStatus?.id}' THEN 1 ELSE 0 END) AS openTickets
     FROM tickets
     GROUP BY year, month
     ORDER BY year DESC, month DESC
   `);
+}
+
+export async function getTotalTicketCategorySummaryModel() {
+  const result = await db.query(`
+    SELECT 
+      c.id AS category_id,
+      c.name AS category_name,
+      COUNT(t.id) AS total_tickets
+    FROM categories c
+    LEFT JOIN tickets t ON c.id = t.category_id
+    GROUP BY c.id, c.name
+    ORDER BY total_tickets DESC
+  `);
+  return result;
+}
+
+export async function getMonthlyTicketCategoryModel() {
+  const result = await db.query(`
+    SELECT 
+      c.name AS category_name,
+      EXTRACT(MONTH FROM t.created_at) AS month,
+      COUNT(t.id) AS total_tickets
+    FROM categories c
+    LEFT JOIN tickets t ON c.id = t.category_id
+    GROUP BY c.name, month
+    ORDER BY c.name, month
+  `);
+  return result;
+}
+
+export async function getTotalTicketStatusModel() {
+  // {status_id: string, status_name: string, total_tickets: number, more_tickets_for_this_status_this_month: boolean}
+  const result = await db.query(`
+    SELECT 
+      s.id AS status_id,
+      s.name AS status_name,
+      COUNT(t.id) AS total_tickets,
+      CASE
+        WHEN COUNT(CASE WHEN DATE_TRUNC('month', t.created_at) = DATE_TRUNC('month', NOW()) THEN 1 END) >
+             COUNT(CASE WHEN DATE_TRUNC('month', t.created_at) = DATE_TRUNC('month', NOW() - INTERVAL '1 month') THEN 1 END)
+        THEN TRUE
+        ELSE FALSE
+      END AS more_tickets_for_this_status_this_month
+    FROM ticket_statuses s
+    LEFT JOIN tickets t ON s.id = t.status_id
+    GROUP BY s.id, s.name
+    ORDER BY total_tickets DESC
+  `);
+  return result;
+}
+
+
+export async function getTicketsPerBranchSummaryModel() {
+  const result = await db.query(`
+    SELECT 
+      b.id AS branch_id,
+      b.name AS branch_name,
+      COUNT(t.id) AS total_tickets,
+      SUM(COUNT(t.id)) OVER () AS all_branches_ticket_total
+    FROM branches b
+    LEFT JOIN tickets t ON t.branch_id = b.id
+    GROUP BY b.id, b.name
+    ORDER BY total_tickets DESC
+    `);
+  return result;
+}
+
+export async function getLastXTicketsByDateUpdatedModel(limit: number) {
+  const restult = await db.query(`
+    SELECT
+      t.title,
+      c.name AS category,
+      p.name as priority_name,
+      s.name AS status_name,
+      s.css_class AS status_css_class,
+      u.name AS created_by,
+      t.updated_at
+    FROM tickets t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN ticket_priorities p ON t.priority_id = p.id
+    LEFT JOIN ticket_statuses s ON t.status_id = s.id
+    LEFT JOIN users u ON t.created_by = u.id
+    ORDER BY t.updated_at DESC
+    LIMIT $1
+  `, [limit]);
+  return restult;
 }
