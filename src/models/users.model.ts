@@ -185,3 +185,31 @@ export async function getFormatedAuthUsersModel(userIds: string) {
   };
   return formattedUser;
 }
+
+export async function getTotalUserSummaryPayload() {
+  // {total_users: number, more_users_for_this_month_compared_to_last_month: boolean, last_month_total_users : number, this_month_total_users: number}
+  const userSummary = await db.query(`
+    SELECT
+      (SELECT COUNT(*) FROM users) AS total_users,
+      (SELECT COUNT(*) FROM users WHERE DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE) AND DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE)) AS this_month_total_users,
+      (SELECT COUNT(*) FROM users WHERE DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE - INTERVAL '1 month') AND DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE - INTERVAL '1 month')) AS last_month_total_users,
+      CASE
+        WHEN
+          (SELECT COUNT(*) FROM users WHERE DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE) AND DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE))
+          >
+          (SELECT COUNT(*) FROM users WHERE DATE_PART('month', created_at) = DATE_PART('month', CURRENT_DATE - INTERVAL '1 month') AND DATE_PART('year', created_at) = DATE_PART('year', CURRENT_DATE - INTERVAL '1 month'))
+        THEN TRUE
+        ELSE FALSE
+      END AS more_users_for_this_month_compared_to_last_month
+    `)
+
+
+  const formatedResult = {
+    totalUsers: Number(userSummary.rows[0].total_users),
+    moreThisMonth:
+      userSummary.rows[0].more_users_for_this_month_compared_to_last_month,
+    lastMonthTotalUsers: Number(userSummary.rows[0].last_month_total_users),
+    thisMonthTotalUsers: Number(userSummary.rows[0].this_month_total_users),
+  };
+  return formatedResult;
+}
