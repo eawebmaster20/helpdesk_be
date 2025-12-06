@@ -121,6 +121,10 @@ export async function addSLACompliance(ticket: FormattedTicket): Promise<void> {
   try {
     const responseMet = await is_response_met(ticket);
     const resolutionMet = await is_resolution_met(ticket);
+    console.log({
+      responseMet,
+      resolutionMet
+    })
     await db.query(`
     INSERT INTO sla_compliance (ticket_id, sla_policy_id, responded_at, resolved_at, response_met, resolution_met, created_at)
     VALUES ($1, $2, $3, $4, $5, $6, NOW())
@@ -137,15 +141,27 @@ export async function addSLACompliance(ticket: FormattedTicket): Promise<void> {
     return true;
   }
   const responseTimeInMinutes = ticket.sla!.response_time_hours * 60;
-  const timeSinceCreated = Date.now() - new Date(ticket.created_at).getTime();
+  const timeSinceCreated = new Date(ticket.created_at).getTime() - Date.now();
+  console.log({
+    responseTimeInMinutes: responseTimeInMinutes * 60 * 1000,
+    timeSinceCreated
+  })
   return timeSinceCreated <= responseTimeInMinutes * 60 * 1000;
 }
 
   async function is_resolution_met(ticket: FormattedTicket): Promise<boolean> {
-  if (ticket?.status?.name.toLocaleLowerCase() === 'closed' || ticket?.status?.name.toLocaleLowerCase() === 'resolved') {
-    return true;
+    if (ticket?.status?.name.toLocaleLowerCase() === 'closed' || ticket?.status?.name.toLocaleLowerCase() === 'resolved') {
+      return true;
+    }
+    const resolutionTimeInMinutes = ticket.sla!.resolution_time_hours * 60;
+    const timeSinceCreated = new Date(ticket.created_at).getTime() - Date.now();
+    // console.log('--------------------------------------------------------------------------')
+    // console.log({
+    //   resolutionTimeInMinutes: resolutionTimeInMinutes * 60 * 1000,
+    //   now: Date.now(),
+    //   createdAt: new Date(ticket.created_at).getTime(),
+    //   timeSinceCreated
+    // })
+    // console.log('--------------------------------------------------------------------------')
+    return timeSinceCreated <= resolutionTimeInMinutes * 60 * 1000;
   }
-  const resolutionTimeInMinutes = ticket.sla!.resolution_time_hours * 60;
-  const timeSinceCreated = Date.now() - new Date(ticket.created_at).getTime();
-  return timeSinceCreated <= resolutionTimeInMinutes * 60 * 1000;
-}

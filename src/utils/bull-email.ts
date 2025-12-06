@@ -11,6 +11,7 @@ import {
 import { FormattedTicket } from "../models/ticket.model";
 import { get } from "http";
 import { getFormattedUsersByEmailModel } from "../models/users.model";
+import { addSLACompliance } from "../models/sla.model";
 
 // Configure Redis connection for Bull
 const emailQueue = new bull("emailQueue", {
@@ -67,7 +68,7 @@ emailQueue.on("failed", (job, err) => {
   );
 });
 
-emailQueue.on("completed", (job, result) => {
+emailQueue.on("completed", async (job, result) => {
   console.log(
     JSON.stringify({
       level: "info",
@@ -77,8 +78,16 @@ emailQueue.on("completed", (job, result) => {
       jobId: job.id,
       email: job.data.to,
       timestamp: new Date().toISOString(),
+      ticket: job.data.ticket,
     })
-  );
+  );  
+    if (job.data.ticket) {
+        try {
+            await addSLACompliance(job.data.ticket);
+        } catch (error) {
+            console.error("Failed to add SLA compliance after email sent:", error);
+        }
+    }
 });
 
 const transporter = nodemailer.createTransport({
@@ -219,12 +228,13 @@ export const sendEmail = async (
       `Sending ${type} email to ${userEmails.length} recipients for ticket ${ticket.ticket_number}`
     );
 
-    for (const recipient of userEmails) {
+    for (const [index, recipient] of userEmails.entries()) {
       await addEmailToQueue({
         from: process.env.EMAIL_USER || "",
         to: recipient.email,
         subject,
         html: htmlContent,
+        ticket: index > 0 ? undefined : ticket,
       });
     }
   } catch (error) {

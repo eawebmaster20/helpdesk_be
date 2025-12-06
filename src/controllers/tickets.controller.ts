@@ -515,7 +515,6 @@ export async function createTicket(req: Request, res: Response) {
       data: newTicket,
       status: "success",
     });
-    await addSLACompliance(newTicket);
     // const formatedTicket = await getFormatedTicketsIdModel(newTicket.id);
     sendEmail('ticket_created', usersToEmail, `Ticket ${ticketNumber} Created`, newTicket);
 
