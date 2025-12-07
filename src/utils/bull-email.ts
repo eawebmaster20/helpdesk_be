@@ -11,7 +11,7 @@ import {
 import { FormattedTicket } from "../models/ticket.model";
 import { get } from "http";
 import { getFormattedUsersByEmailModel } from "../models/users.model";
-import { addSLACompliance } from "../models/sla.model";
+import { addSLACompliance, updateSLACompliance } from "../models/sla.model";
 
 // Configure Redis connection for Bull
 const emailQueue = new bull("emailQueue", {
@@ -23,8 +23,8 @@ const emailQueue = new bull("emailQueue", {
 });
 
 // Add queue event listeners for debugging
-emailQueue.on('ready', () => {
-    console.log('Email queue is ready and connected to Redis');
+emailQueue.on("ready", () => {
+  console.log("Email queue is ready and connected to Redis");
 });
 emailQueue.on("active", (job) => {
   console.log(
@@ -80,14 +80,14 @@ emailQueue.on("completed", async (job, result) => {
       timestamp: new Date().toISOString(),
       ticket: job.data.ticket,
     })
-  );  
-    if (job.data.ticket) {
-        try {
-            await addSLACompliance(job.data.ticket);
-        } catch (error) {
-            console.error("Failed to add SLA compliance after email sent:", error);
-        }
+  );
+  if (job.data.ticket) {
+    try {
+      await updateSLACompliance(job.data.ticket.id, "response");
+    } catch (error) {
+      console.error("Failed to update SLA compliance after email sent:", error);
     }
+  }
 });
 
 const transporter = nodemailer.createTransport({
@@ -133,7 +133,7 @@ export const addEmailToQueue = async (emailJob: EmailJob): Promise<boolean> => {
   }
 
   try {
-    console.log('Adding email to queue:', emailJob.to, emailJob.subject);
+    console.log("Adding email to queue:", emailJob.to, emailJob.subject);
     await emailQueue.add(emailJob, {
       attempts: 3,
       backoff: {
@@ -171,7 +171,7 @@ export const sendEmail = async (
   attachmentName?: string
 ) => {
   // Early check for email activation
-  console.log('validating email sending activation status...');
+  console.log("validating email sending activation status...");
   if (
     !process.env.ACTIVATE_EMAIL ||
     process.env.ACTIVATE_EMAIL.toLowerCase() !== "true"
