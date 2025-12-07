@@ -1,3 +1,4 @@
+import { response } from "express";
 import { db } from "../db";
 import { getTicketsComplianceModel } from "../models/sla.model";
 
@@ -54,12 +55,20 @@ async function checkSLACompliance(): Promise<void> {
       // Check resolution time breach
       const resolutionTimeMs =
         ticket.sla_policy?.resolution_time_hours * 60 * 60 * 1000;
+      const responseMet = ticket.responded_at
+        ? new Date(ticket.responded_at).getTime() - createdAt <=
+          ticket.sla_policy?.response_time_hours * 60 * 60 * 1000
+        : false;
+      const resolutionMet = ticket.resolved_at
+        ? new Date(ticket.resolved_at).getTime() - createdAt <= resolutionTimeMs
+        : false;
       //   const resolutionMet = timeSinceCreated <= resolutionTimeMs;
       console.log({
         ...ticket,
         resolutionTimeMs,
         timeSinceCreated,
-        // resolutionMet,
+        responseMet,
+        resolutionMet,
       });
 
       // Update or insert SLA compliance record
