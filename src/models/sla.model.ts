@@ -1,4 +1,6 @@
 import { db } from "../db";
+import { TicketWithSLA } from "../types/sla";
+import { convertSlaTimeToWorkingHours } from "../utils/sla";
 import { FormattedTicket } from "./ticket.model";
 
 export async function createSLAModel(
@@ -108,23 +110,30 @@ export async function createSLAWithMinutes(
   return result.rows[0];
 }
 
-export async function getTicketSLABreachTimes(ticketId: string) {
-  const result = await db.query(
-    `
-    SELECT 
-      t.created_at,
-      t.status,
-      sp.response_time_hours,
-      sp.resolution_time_hours,
-      sp.name as sla_policy_name
-    FROM tickets t
-    LEFT JOIN sla_policies sp ON t.sla_policy_id = sp.id
-    WHERE t.id = $1
-  `,
-    [ticketId]
-  );
+export async function getTicketsComplianceModel() {
+  const result = await db.query<TicketWithSLA>(`
+          SELECT
+          sc.ticket_id,
+          t.ticket_number,
+          t.created_at,
+          sc.responded_at,
+          sc.resolved_at,
+          sc.response_met,
+          sc.resolution_met,
+          jsonb_build_object(
+            'id', sp.id,
+            'name', sp.name,
+            'response_time_hours', sp.response_time_hours,
+            'resolution_time_hours', sp.resolution_time_hours
+          ) as sla_policy
+          FROM sla_compliance sc
+          INNER JOIN tickets t ON sc.ticket_id = t.id
+          INNER JOIN sla_policies sp ON sc.sla_policy_id = sp.id
+          INNER JOIN ticket_statuses s ON t.status_id = s.id
+          WHERE LOWER(s.name) NOT IN ('closed', 'resolved')
+      `);
 
-  return result.rows[0];
+  return result.rows;
 }
 
 export async function addSLACompliance(ticket: FormattedTicket): Promise<void> {
@@ -134,18 +143,35 @@ export async function addSLACompliance(ticket: FormattedTicket): Promise<void> {
   }
 
   try {
-    const responseMet = await is_response_met(ticket);
-    const resolutionMet = await is_resolution_met(ticket);
+    const responseMet = false; //await is_response_met(ticket);
+    const resolutionMet = false; //await is_resolution_met(ticket);
+    const resolutionExpireAt = await convertSlaTimeToWorkingHours(
+      ticket.sla!.resolution_time_hours
+    );
+    const responseExpireAt = await convertSlaTimeToWorkingHours(
+      ticket.sla!.response_time_hours
+    );
     console.log({
       responseMet,
       resolutionMet,
+      responseExpireAt: responseExpireAt.breachDateISO,
+      resolutionExpireAt: resolutionExpireAt.breachDateISO,
     });
     await db.query(
       `
-    INSERT INTO sla_compliance (ticket_id, sla_policy_id, responded_at, resolved_at, response_met, resolution_met, created_at)
-    VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    INSERT INTO sla_compliance (ticket_id, sla_policy_id, responded_at, resolved_at, response_expire_at, resolution_expire_at, response_met, resolution_met, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
   `,
-      [ticket.id, ticket.sla!.id, null, null, responseMet, resolutionMet]
+      [
+        ticket.id,
+        ticket.sla!.id,
+        null,
+        null,
+        responseExpireAt.breachDateISO,
+        resolutionExpireAt.breachDateISO,
+        responseMet,
+        resolutionMet,
+      ]
     );
   } catch (error) {
     console.error("Error adding SLA compliance record:", error);
@@ -159,33 +185,32 @@ export async function updateSLACompliance(
   field: "response" | "resolution"
 ): Promise<void> {
   const column = field === "response" ? "responded_at" : "resolved_at";
-  const timestampColumn = field === "response" ? "responded_at" : "resolved_at";
+  // const timestampColumn = field === "response" ? "responded_at" : "resolved_at";
   const value = await db.query(
     `
     UPDATE sla_compliance
-    SET ${column} = NOW(),
-        ${field === "response" ? "response_met" : "resolution_met"} = TRUE
+    SET ${column} = NOW()
     WHERE ticket_id = $1
   `,
     [ticketId]
   );
 }
 
-async function is_response_met(ticket: FormattedTicket): Promise<boolean> {
-  if (
-    ticket?.status?.name.toLocaleLowerCase() === "closed" ||
-    ticket?.status?.name.toLocaleLowerCase() === "resolved"
-  ) {
-    return true;
-  }
-  const responseTimeInMinutes = ticket.sla!.response_time_hours * 60;
-  const timeSinceCreated = Date.now() - new Date(ticket.created_at).getTime();
-  console.log({
-    responseTimeInMinutes: responseTimeInMinutes * 60 * 1000,
-    timeSinceCreated,
-  });
-  return timeSinceCreated <= responseTimeInMinutes * 60 * 1000;
-}
+// async function is_response_met(ticket: FormattedTicket): Promise<boolean> {
+//   if (
+//     ticket?.status?.name.toLocaleLowerCase() === "closed" ||
+//     ticket?.status?.name.toLocaleLowerCase() === "resolved"
+//   ) {
+//     return true;
+//   }
+//   const responseTimeInMinutes = ticket.sla!.response_time_hours * 60;
+//   const timeSinceCreated = Date.now() - new Date(ticket.created_at).getTime();
+//   console.log({
+//     responseTimeInMinutes: responseTimeInMinutes * 60 * 1000,
+//     timeSinceCreated,
+//   });
+//   return timeSinceCreated <= responseTimeInMinutes * 60 * 1000;
+// }
 
 async function is_resolution_met(ticket: FormattedTicket): Promise<boolean> {
   if (

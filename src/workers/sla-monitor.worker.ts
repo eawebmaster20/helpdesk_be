@@ -1,23 +1,7 @@
 import { db } from "../db";
-import { getFormatedTicketsModel } from "../models/ticket.model";
+import { getTicketsComplianceModel } from "../models/sla.model";
 
 const CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
-
-interface TicketWithSLA {
-  ticket_id: string;
-  ticket_number: string;
-  created_at: Date;
-  responded_at: Date | null;
-  resolved_at: Date | null;
-  response_met: boolean;
-  resolution_met: boolean;
-  sla_policy: {
-    id: string;
-    name: string;
-    response_time_hours: number;
-    resolution_time_hours: number;
-  };
-}
 
 async function checkSLACompliance(): Promise<void> {
   if (
@@ -32,30 +16,30 @@ async function checkSLACompliance(): Promise<void> {
     console.log(
       `[${new Date().toISOString()}] Starting SLA compliance check...`
     );
+    const result = await getTicketsComplianceModel();
+    // const result = await db.query<TicketWithSLA>(`
+    //     SELECT
+    //     sc.ticket_id,
+    //     t.ticket_number,
+    //     t.created_at,
+    //     sc.responded_at,
+    //     sc.resolved_at,
+    //     sc.response_met,
+    //     sc.resolution_met,
+    //     jsonb_build_object(
+    //       'id', sp.id,
+    //       'name', sp.name,
+    //       'response_time_hours', sp.response_time_hours,
+    //       'resolution_time_hours', sp.resolution_time_hours
+    //     ) as sla_policy
+    //     FROM sla_compliance sc
+    //     INNER JOIN tickets t ON sc.ticket_id = t.id
+    //     INNER JOIN sla_policies sp ON sc.sla_policy_id = sp.id
+    //     INNER JOIN ticket_statuses s ON t.status_id = s.id
+    //     WHERE LOWER(s.name) NOT IN ('closed', 'resolved')
+    // `);
 
-    const result = await db.query<TicketWithSLA>(`
-        SELECT
-        sc.ticket_id,
-        t.ticket_number,
-        t.created_at,
-        sc.responded_at,
-        sc.resolved_at,
-        sc.response_met,
-        sc.resolution_met,
-        jsonb_build_object(
-          'id', sp.id,
-          'name', sp.name,
-          'response_time_hours', sp.response_time_hours,
-          'resolution_time_hours', sp.resolution_time_hours
-        ) as sla_policy
-        FROM sla_compliance sc
-        INNER JOIN tickets t ON sc.ticket_id = t.id
-        INNER JOIN sla_policies sp ON sc.sla_policy_id = sp.id
-        INNER JOIN ticket_statuses s ON t.status_id = s.id
-        WHERE LOWER(s.name) NOT IN ('closed', 'resolved')
-    `);
-
-    const tickets = result.rows;
+    const tickets = result;
     console.log(`Found ${tickets.length} tickets to check`);
 
     for (const ticket of tickets) {
@@ -72,8 +56,7 @@ async function checkSLACompliance(): Promise<void> {
         ticket.sla_policy?.resolution_time_hours * 60 * 60 * 1000;
       //   const resolutionMet = timeSinceCreated <= resolutionTimeMs;
       console.log({
-        ticket_number: ticket.ticket_number,
-        resolution: ticket.resolved_at,
+        ...ticket,
         resolutionTimeMs,
         timeSinceCreated,
         // resolutionMet,
