@@ -23,6 +23,7 @@ import { db, initializeDatabase, resetDatabase } from "./db/index";
 import { newSetupHandlers } from "./websockets/ticket.socket";
 import { addEmailToQueue } from "./utils/bull-email";
 import { logRequest } from "./utils/logger";
+import { startSLAMonitor } from "./workers/sla-monitor.worker";
 
 const app: Application = express();
 const httpServer = createServer(app);
@@ -30,13 +31,14 @@ const httpServer = createServer(app);
 // Setup Socket.IO with CORS
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NODE_ENV === "production" 
-      ? [process.env.FRONTEND_URL || "https://yourdomain.com"] 
-      : "*", // Allow all origins for development; restrict in production
+    origin:
+      process.env.NODE_ENV === "production"
+        ? [process.env.FRONTEND_URL || "https://yourdomain.com"]
+        : "*", // Allow all origins for development; restrict in production
     credentials: true,
     methods: ["GET", "POST"],
-    allowedHeaders: ["Authorization", "Content-Type"]
-  }
+    allowedHeaders: ["Authorization", "Content-Type"],
+  },
 });
 
 // Make io available globally
@@ -52,7 +54,7 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-// implement a rubust logging for every request 
+// implement a rubust logging for every request
 app.use(logRequest);
 
 // API routes
@@ -118,11 +120,11 @@ app.get("/test-email", async (req: Request, res: Response) => {
   try {
     // Simulate sending a test email
     const emailSent = await addEmailToQueue({
-          from: process.env.EMAIL_USER || '',
-          to: req.body.to,
-          subject: `Ticket Created`,
-          text: `Your ticket has been created with ticket number.`
-        })
+      from: process.env.EMAIL_USER || "",
+      to: req.body.to,
+      subject: `Ticket Created`,
+      text: `Your ticket has been created with ticket number.`,
+    });
     // const emailSent = await sendTestEmail(req.body.to);
     if (emailSent) {
       res.json({ message: "Test email sent successfully" });
@@ -190,6 +192,9 @@ const startServer = async () => {
     // Setup WebSocket handlers
     // setupTicketSocketHandlers(io);
     newSetupHandlers(io);
+
+    // Start SLA monitoring worker
+    startSLAMonitor();
 
     httpServer.listen(PORT, () => {
       console.log("\nServer is running!");
