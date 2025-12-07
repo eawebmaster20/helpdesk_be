@@ -1,6 +1,9 @@
 import { response } from "express";
 import { db } from "../db";
-import { getTicketsComplianceModel } from "../models/sla.model";
+import {
+  getTicketsComplianceModel,
+  updateSLACompliance,
+} from "../models/sla.model";
 
 const CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
 
@@ -44,14 +47,7 @@ async function checkSLACompliance(): Promise<void> {
     console.log(`Found ${tickets.length} tickets to check`);
 
     for (const ticket of tickets) {
-      const now = Date.now();
       const createdAt = new Date(ticket.created_at).getTime();
-      const timeSinceCreated = now - createdAt;
-
-      // Check response time breach
-      //   const responseTimeMs = ticket.sla?.response_time_hours * 60 * 60 * 1000;
-      //   const responseMet = timeSinceCreated <= responseTimeMs;
-
       // Check resolution time breach
       const resolutionTimeMs =
         ticket.sla_policy?.resolution_time_hours * 60 * 60 * 1000;
@@ -62,52 +58,14 @@ async function checkSLACompliance(): Promise<void> {
       const resolutionMet = ticket.resolved_at
         ? new Date(ticket.resolved_at).getTime() - createdAt <= resolutionTimeMs
         : false;
-      //   const resolutionMet = timeSinceCreated <= resolutionTimeMs;
-      console.log({
-        ...ticket,
-        resolutionTimeMs,
-        timeSinceCreated,
-        responseMet,
-        resolutionMet,
-      });
 
       // Update or insert SLA compliance record
-      //   await db.query(
-      //     `
-      //     INSERT INTO sla_compliance (ticket_id, sla_policy_id, responded_at, resolved_at, response_met, resolution_met, created_at, updated_at)
-      //     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-      //     ON CONFLICT (ticket_id)
-      //     DO UPDATE SET
-      //       response_met = $5,
-      //       resolution_met = $6,
-      //       updated_at = NOW()
-      //   `,
-      //     [
-      //       ticket.id,
-      //       ticket.sla_policy_id,
-      //       ticket.responded_at,
-      //       ticket.resolved_at,
-      //       responseMet,
-      //       resolutionMet,
-      //     ]
-      //   );
-
-      //   if (!responseMet || !resolutionMet) {
-      //     console.log(
-      //       //   JSON.stringify(
-      //       {
-      //         level: "warn",
-      //         service: "sla-monitor",
-      //         event_type: "sla_breach",
-      //         ticket_number: ticket.ticket_number,
-      //         ticket_id: ticket.id,
-      //         response_breached: !responseMet,
-      //         resolution_breached: !resolutionMet,
-      //         timestamp: new Date().toISOString(),
-      //       }
-      //       //)
-      //     );
-      //   }
+      await updateSLACompliance(ticket.ticket_id, "response_met", responseMet);
+      await updateSLACompliance(
+        ticket.ticket_id,
+        "resolution_met",
+        resolutionMet
+      );
     }
 
     console.log(`[${new Date().toISOString()}] SLA compliance check completed`);
