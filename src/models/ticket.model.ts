@@ -465,8 +465,8 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
         s.css_class as status_class,
         s.enabled as status_enabled,
         sc.id as sla_compliance_id,
-        sc.responded_at as sla_responded_at,
-        sc.resolved_at as sla_resolved_at,
+        sc.response_expire_at as sla_response_expire_at,
+        sc.resolution_expire_at as sla_resolution_expire_at,
         sc.resolution_met as sla_resolution_met,
         sc.response_met as sla_response_met,
         ta_escalation.created_at as escalated_time,
@@ -495,7 +495,7 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
                u_assignee.id, u_assignee.name, u_assignee.email,
                p.id, p.name, p.enabled,
                 s.id, s.name, s.enabled, s.css_class,
-               sc.id, sc.responded_at, sc.resolved_at, sc.response_met, sc.resolution_met,
+               sc.id, sc.response_expire_at, sc.resolution_expire_at, sc.response_met, sc.resolution_met,
                ta_escalation.created_at, u_escalator.id, u_escalator.name, u_escalator.email
       ORDER BY t.created_at DESC
     `, [assigneeId]);
@@ -546,10 +546,10 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
     } : null,
     sla_compliance: row.sla_compliance_id ? {
       id: row.sla_compliance_id,
-      responded_at: row.sla_responded_at,
-      resolved_at: row.sla_resolved_at,
-      response_met: row.sla_response_met,
-      resolution_met: row.sla_resolution_met
+      responseExpireAt: row.sla_response_expire_at,
+      resolutionExpireAt: row.sla_resolution_expire_at,
+      responseMet: row.sla_response_met,
+      resolutionMet: row.sla_resolution_met
     } : null,
     branch: row.branch_id ? {
       id: row.branch_id,
