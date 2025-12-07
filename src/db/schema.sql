@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS sla_compliance (
   sla_policy_id UUID NOT NULL REFERENCES sla_policies(id) ON DELETE CASCADE,
   responded_at TIMESTAMP,
   resolved_at TIMESTAMP,
+  policy_expire_at TIMESTAMP,
   response_met BOOLEAN,
   resolution_met BOOLEAN,
   created_at TIMESTAMP DEFAULT NOW(),
