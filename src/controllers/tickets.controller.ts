@@ -18,15 +18,28 @@ import {
 import { Request, Response } from "express";
 import { db } from "../db";
 import { io } from "../index";
-import { emitTicketActivityUpdate, emitTicketCreatedEvent, emitTicketUpdate, emitUserTicketAssign } from "../websockets/ticket.socket";
+import {
+  emitTicketActivityUpdate,
+  emitTicketCreatedEvent,
+  emitTicketUpdate,
+  emitUserTicketAssign,
+} from "../websockets/ticket.socket";
 import { sendEmail } from "../utils/bull-email";
 import { applySLAPolicyToTicket } from "./sla.controller";
-import { addSLACompliance } from "../models/sla.model";
+import { addSLACompliance, updateSLACompliance } from "../models/sla.model";
 import { getAllStatusesModel } from "../models/statuses.model";
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
-  const { title, userId, description, statusId, priorityId, categoryId, assigneeId } = req.body;
+  const {
+    title,
+    userId,
+    description,
+    statusId,
+    priorityId,
+    categoryId,
+    assigneeId,
+  } = req.body;
   try {
     const unUpdatedTicket = await getFormatedTicketsIdModel(id);
     const result = await updateTicketModel(
@@ -41,9 +54,9 @@ export async function updateTicket(req: Request, res: Response) {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Ticket not found" });
     }
-    
+
     const updatedTicket = await getFormatedTicketsIdModel(id);
-    let action = ""
+    let action = "";
     // Determine what was updated for activity tracking
     if (title && title !== unUpdatedTicket.title) {
       action += `changed title from "${title}" to "${updatedTicket.title}". `;
@@ -54,7 +67,10 @@ export async function updateTicket(req: Request, res: Response) {
     if (statusId && statusId !== unUpdatedTicket.status?.id) {
       action += `changed status from "${unUpdatedTicket.status?.name}" to "${updatedTicket.status?.name}". `;
     }
-    if ((priorityId && priorityId !== unUpdatedTicket.priority?.id) || (categoryId && categoryId !== unUpdatedTicket.category?.id)) {
+    if (
+      (priorityId && priorityId !== unUpdatedTicket.priority?.id) ||
+      (categoryId && categoryId !== unUpdatedTicket.category?.id)
+    ) {
       if (priorityId && !categoryId) {
         action += `changed priority from "${unUpdatedTicket.priority?.name}" to "${updatedTicket.priority?.name}". `;
       }
@@ -68,7 +84,7 @@ export async function updateTicket(req: Request, res: Response) {
     // if (assigneeId !== ticketResult.assignee?.id) {
     //   action += `Reassigned assignee from "${ticketResult.assignee?.name}" to "${assigneeId}". `;
     // }
-    await addTicketActivityModel(id, 'status', userId, action);
+    await addTicketActivityModel(id, "status", userId, action);
     const usersToNotify = new Set<string>();
     usersToNotify.add(`${updatedTicket.created_by?.id}:ticket:update`);
     if (updatedTicket.created_for?.id) {
@@ -84,7 +100,7 @@ export async function updateTicket(req: Request, res: Response) {
     const usersToEmail = [
       updatedTicket.created_by?.id,
       // updatedTicket.assignee?.id,
-      updatedTicket.created_for?.id
+      updatedTicket.created_for?.id,
     ].filter(Boolean) as string[];
 
     res.status(200).json();
@@ -92,10 +108,16 @@ export async function updateTicket(req: Request, res: Response) {
     emitTicketUpdate(io, assigneeId, [...usersToNotify], {
       data: updatedTicket,
       message: "A ticket has been updated",
-      success: true
+      success: true,
     });
-    if (updatedTicket?.status?.name === 'Resolved') {
-      sendEmail('status_update', usersToEmail, `There is an update on your ticket ${updatedTicket.ticket_number}`, updatedTicket);
+    if (updatedTicket?.status?.name === "resolved") {
+      sendEmail(
+        "status_update",
+        usersToEmail,
+        `There is an update on your ticket ${updatedTicket.ticket_number}`,
+        updatedTicket
+      );
+      await updateSLACompliance(updatedTicket.id, "resolution");
     }
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
@@ -110,7 +132,10 @@ export async function updateTicket(req: Request, res: Response) {
 export async function addTicketComment(req: Request, res: Response) {
   const { id } = req.params;
   const { comment, type, userId } = req.body;
-  const user = await db.query("SELECT id, name, email FROM users WHERE id = $1", [userId]);
+  const user = await db.query(
+    "SELECT id, name, email FROM users WHERE id = $1",
+    [userId]
+  );
   if (user.rowCount === 0) {
     res.status(400).json({ message: "Invalid user" });
     return;
@@ -121,8 +146,8 @@ export async function addTicketComment(req: Request, res: Response) {
     return;
   }
   const action = "added a comment";
- try {
-   await addTicketActivityModel(id, type, userId, action, comment);
+  try {
+    await addTicketActivityModel(id, type, userId, action, comment);
     const updatedActivities = await getTicketActivitiesModel(id);
     const usersToNotify = new Set<string>();
     usersToNotify.add(`ticket:activity:update`);
@@ -139,9 +164,9 @@ export async function addTicketComment(req: Request, res: Response) {
       success: true,
     });
     res.status(201).json();
- } catch (error) {
+  } catch (error) {
     res.status(500).json({ message: "Database error", error: error });
- }
+  }
 }
 
 export async function addTicketAttachment(req: Request, res: Response) {
@@ -153,16 +178,18 @@ export async function addTicketAttachment(req: Request, res: Response) {
       .json({ message: "urls and uploadedBy are required" });
   }
   try {
-    console.log('activity added')
-    const result = await addTicketAttachmentModel(
-      id,
-      urls,
-      uploadedBy
-    );
-    
+    console.log("activity added");
+    const result = await addTicketAttachmentModel(id, urls, uploadedBy);
+
     // Add activity tracking
     const action = "added an attachment";
-    await addTicketActivityModel(id, 'attachment', uploadedBy, action, `Added ${urls.length} attachment(s)`);
+    await addTicketActivityModel(
+      id,
+      "attachment",
+      uploadedBy,
+      action,
+      `Added ${urls.length} attachment(s)`
+    );
     const ticket = await getFormatedTicketsIdModel(id);
     const ticketActivities = await getTicketActivitiesModel(id);
     const usersToNotifyOnActivity = new Set<string>();
@@ -174,7 +201,7 @@ export async function addTicketAttachment(req: Request, res: Response) {
     emitTicketActivityUpdate(io, Array.from(usersToNotifyOnActivity), {
       data: ticketActivities,
       message: "A ticket has been updated",
-      success: true
+      success: true,
     });
     const usersToNotify = new Set<string>();
     usersToNotify.add(`tickets:update`);
@@ -182,7 +209,7 @@ export async function addTicketAttachment(req: Request, res: Response) {
     emitTicketActivityUpdate(io, Array.from(usersToNotify), {
       data: ticket,
       message: "A ticket has been updated",
-      success: true
+      success: true,
     });
     res.status(201).json(result);
   } catch (err) {
@@ -194,7 +221,7 @@ export async function assignTicket(req: Request, res: Response) {
   const { id } = req.params;
   const auto = process.env.AUTO_ASSIGN_TICKETS;
   const { assigneeId, userId, statusId } = req.body;
-  if (auto === 'true') {
+  if (auto === "true") {
     return res.status(501).json({ message: "Auto-assign not implemented" });
   }
   if (!assigneeId) {
@@ -203,10 +230,14 @@ export async function assignTicket(req: Request, res: Response) {
       .json({ message: "assigneeId is required if auto is not set" });
   }
   if (!userId) {
-    return res.status(400).json({ message: "userId is required for activity tracking" });
+    return res
+      .status(400)
+      .json({ message: "userId is required for activity tracking" });
   }
-  if(!statusId) {
-    return res.status(400).json({ message: "statusId is required for status transition" });
+  if (!statusId) {
+    return res
+      .status(400)
+      .json({ message: "statusId is required for status transition" });
   }
   try {
     // Get assignee name for activity description
@@ -219,37 +250,41 @@ export async function assignTicket(req: Request, res: Response) {
       [id]
     );
     const createdBy = createdByResult.rows[0]?.created_by;
-    
+
     const result = await assignTicketModel(id, assigneeId, statusId);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Ticket not found" });
     }
-    
-    
+
     // Add activity tracking
-    const assignee = assigneeResult.rows[0] || 'Unknown User';
+    const assignee = assigneeResult.rows[0] || "Unknown User";
     const action = `assigned the ticket to ${assignee.name}`;
-    await addTicketActivityModel(id, 'assignment', userId, action);
-    
+    await addTicketActivityModel(id, "assignment", userId, action);
+
     const ticket = await getFormatedTicketsIdModel(id);
     const usersInvolved = [
-      `${assigneeId}:ticket:assign`, 
+      `${assigneeId}:ticket:assign`,
       `${createdBy}:ticket:update`,
-      `tickets:update`
+      `tickets:update`,
     ];
     emitUserTicketAssign(io, assigneeId, usersInvolved, {
       data: ticket,
       message: "A ticket has been assigned",
       success: true,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    
+
     const usersToEmail = [
       ticket.assignee?.id,
       // ticket.created_by?.id
     ].filter(Boolean) as string[];
-    sendEmail('ticket_assigned', usersToEmail, `Ticket ${ticket.ticket_number} has been assigned to You`, ticket);
-    res.json({ message: "Assigned", data:[] });
+    sendEmail(
+      "ticket_assigned",
+      usersToEmail,
+      `Ticket ${ticket.ticket_number} has been assigned to You`,
+      ticket
+    );
+    res.json({ message: "Assigned", data: [] });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
@@ -274,7 +309,9 @@ export async function transitionTicket(req: Request, res: Response) {
       .json({ message: "Invalid or missing status transition" });
   }
   if (!userId) {
-    return res.status(400).json({ message: "userId is required for activity tracking" });
+    return res
+      .status(400)
+      .json({ message: "userId is required for activity tracking" });
   }
   try {
     const ticketResult = await db.query(
@@ -292,11 +329,11 @@ export async function transitionTicket(req: Request, res: Response) {
       `INSERT INTO ticket_transitions (ticket_id, to_status, reason) VALUES ($1, $2, $3) RETURNING *`,
       [id, to, reason]
     );
-    
+
     // Add activity tracking
     const action = `changed status to ${to}`;
-    await addTicketActivityModel(id, 'status', userId, action, reason);
-    
+    await addTicketActivityModel(id, "status", userId, action, reason);
+
     // Emit real-time event for ticket status change
     emitTicketUpdate(io, userId, ["ticket:statusChanged"], {
       ticketId: id,
@@ -304,9 +341,9 @@ export async function transitionTicket(req: Request, res: Response) {
       reason: reason,
       changedBy: userId,
       message: `Ticket status changed to ${to}`,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    
+
     res.json({ message: "Transitioned", transition: transitionResult.rows[0] });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
@@ -317,7 +354,9 @@ export async function closeTicket(req: Request, res: Response) {
   const { id } = req.params;
   const { userId, reason, statusId } = req.body;
   if (!userId) {
-    return res.status(400).json({ message: "userId is required for activity tracking" });
+    return res
+      .status(400)
+      .json({ message: "userId is required for activity tracking" });
   }
   try {
     const ticketResult = await getFormatedTicketsIdModel(id);
@@ -326,8 +365,10 @@ export async function closeTicket(req: Request, res: Response) {
     }
     await closeTicketModel(id, statusId);
     // Add activity tracking
-    const action = reason? `closed the ticket with a Reason` : 'closed the ticket';
-    await addTicketActivityModel(id, 'status', userId, action, reason);
+    const action = reason
+      ? `closed the ticket with a Reason`
+      : "closed the ticket";
+    await addTicketActivityModel(id, "status", userId, action, reason);
     const updatedTicket = await getFormatedTicketsIdModel(id);
 
     // Emit real-time event for ticket status change
@@ -337,11 +378,11 @@ export async function closeTicket(req: Request, res: Response) {
     //   timestamp: new Date().toISOString()
     // });
 
-    res.json({ 
+    res.json({
       message: "Ticket closed successfully",
       data: updatedTicket,
-      success: true
-     });
+      success: true,
+    });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
@@ -349,12 +390,12 @@ export async function closeTicket(req: Request, res: Response) {
 
 export async function getTickets(req: Request, res: Response) {
   try {
-    const transformedData = await getFormatedTicketsModel(); 
-    
+    const transformedData = await getFormatedTicketsModel();
+
     res.json({
-      message: '',
+      message: "",
       data: transformedData,
-      status: 'success'
+      status: "success",
     });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
@@ -364,7 +405,8 @@ export async function getTickets(req: Request, res: Response) {
 export async function getTicketsByUser(req: Request, res: Response) {
   const { userId } = req.params;
   try {
-const result = await db.query(`
+    const result = await db.query(
+      `
       SELECT 
         t.*,
         d.name as department_name,
@@ -388,10 +430,12 @@ const result = await db.query(`
       LEFT JOIN users u_owner ON t.created_for = u_owner.id
       WHERE t.created_by = $1 OR t.created_for = $1
       ORDER BY t.created_at DESC
-    `, [userId]);
-    
+    `,
+      [userId]
+    );
+
     // Transform the data to include nested objects
-    const transformedData = result.rows.map(row => ({
+    const transformedData = result.rows.map((row) => ({
       id: row.id,
       ticket_number: row.ticket_number,
       title: row.title,
@@ -401,102 +445,138 @@ const result = await db.query(`
       attachments: row.attachments,
       created_at: row.created_at,
       updated_at: row.updated_at,
-      department: row.department_id ? {
-        id: row.department_id,
-        name: row.department_name
-      } : null,
-      category: row.category_id ? {
-        id: row.category_id,
-        name: row.category_name,
-        description: row.category_description
-      } : null,
+      department: row.department_id
+        ? {
+            id: row.department_id,
+            name: row.department_name,
+          }
+        : null,
+      category: row.category_id
+        ? {
+            id: row.category_id,
+            name: row.category_name,
+            description: row.category_description,
+          }
+        : null,
       created_by: {
         id: row.created_by,
         name: row.created_by_name,
-        email: row.created_by_email
+        email: row.created_by_email,
       },
-      created_for: row.owned_by_id ? {
-        id: row.owned_by_id,
-        name: row.owned_by_name,
-        email: row.owned_by_email
-      } : null,
-      assignee: row.assignee_id ? {
-        id: row.assignee_id,
-        name: row.assignee_name,
-        email: row.assignee_email
-      } : null
+      created_for: row.owned_by_id
+        ? {
+            id: row.owned_by_id,
+            name: row.owned_by_name,
+            email: row.owned_by_email,
+          }
+        : null,
+      assignee: row.assignee_id
+        ? {
+            id: row.assignee_id,
+            name: row.assignee_name,
+            email: row.assignee_email,
+          }
+        : null,
     }));
-    
+
     res.json({
-      message: '',
+      message: "",
       data: transformedData,
-      status: 'success'
+      status: "success",
     });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
 }
 
-
 export async function createTicket(req: Request, res: Response) {
-  const { title, description, departmentId, branchId, createdBy, createdFor, priority, categoryId } = req.body;
-  if (!title || !title.trim() || !createdBy || !createdBy.trim() || !priority || !priority.trim() || !categoryId || !categoryId.trim()) {
+  const {
+    title,
+    description,
+    departmentId,
+    branchId,
+    createdBy,
+    createdFor,
+    priority,
+    categoryId,
+  } = req.body;
+  if (
+    !title ||
+    !title.trim() ||
+    !createdBy ||
+    !createdBy.trim() ||
+    !priority ||
+    !priority.trim() ||
+    !categoryId ||
+    !categoryId.trim()
+  ) {
     return res.status(400).json({
       message:
         "title, departmentId, createdBy, priority, category are required and cannot be empty",
-        value:req.body
+      value: req.body,
     });
   }
-  
+
   try {
-    
     // Generate next ticket number
     const counterResult = await db.query(
       `UPDATE ticket_counter SET current_number = current_number + 1, updated_at = NOW() 
        WHERE id = 1 RETURNING current_number`
     );
 
-    
     const ticketNumber = `TKT-${counterResult.rows[0].current_number}`;
-    
+
     // Create the ticket with the generated ticket number
-    console.log('creating ticket with number:', ticketNumber);
+    console.log("creating ticket with number:", ticketNumber);
     const statuses = await getAllStatusesModel();
-    const defaultStatus = statuses.find(status => status.name.toLowerCase() === 'new');
+    const defaultStatus = statuses.find(
+      (status) => status.name.toLowerCase() === "new"
+    );
     const result = await db.query(
       `INSERT INTO tickets (ticket_number, title, description, department_id, branch_id, created_by, created_for, status_id, priority_id, category_id) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [
-        ticketNumber, 
-        title, 
-        description, 
-        departmentId && departmentId.trim() !== '' ? departmentId : null, 
-        branchId && branchId.trim() !== '' ? branchId : null,
-        createdBy, 
-        createdFor && createdFor.trim() !== '' ? createdFor : null,
-        defaultStatus ? defaultStatus.id : null, 
-        priority, 
-        categoryId && categoryId.trim() !== '' ? categoryId : null
+        ticketNumber,
+        title,
+        description,
+        departmentId && departmentId.trim() !== "" ? departmentId : null,
+        branchId && branchId.trim() !== "" ? branchId : null,
+        createdBy,
+        createdFor && createdFor.trim() !== "" ? createdFor : null,
+        defaultStatus ? defaultStatus.id : null,
+        priority,
+        categoryId && categoryId.trim() !== "" ? categoryId : null,
       ]
     );
-    
+
     const ticketId = result.rows[0].id;
-    console.log('ticket created with id:', ticketId); 
-    
+    console.log("ticket created with id:", ticketId);
+
     // Add initial activity tracking for ticket creation
     const action = "created the ticket";
     if (createdBy && createdFor) {
-      const createdUser = await db.query("SELECT id FROM users WHERE id = $1", [createdBy]);
-      await addTicketActivityModel(ticketId, 'status', createdFor, `ticket a created for ${createdUser.rows[0].name}`);
-    }else {
-      await addTicketActivityModel(ticketId, 'status', createdBy, action);
+      const createdUser = await db.query("SELECT id FROM users WHERE id = $1", [
+        createdBy,
+      ]);
+      await addTicketActivityModel(
+        ticketId,
+        "status",
+        createdFor,
+        `ticket a created for ${createdUser.rows[0].name}`
+      );
+    } else {
+      await addTicketActivityModel(ticketId, "status", createdBy, action);
     }
-    const newTicket = await getFormatedTicketsIdModel(ticketId); 
+    const newTicket = await getFormatedTicketsIdModel(ticketId);
     // Emit real-time event for new ticket creation
     const usersToNotify = new Set<string>();
-    const usersToEmail:string[] = []
+    const usersToEmail: string[] = [];
     usersToNotify.add(`${createdBy}:new`);
-    usersToEmail.push((newTicket.created_by && newTicket.created_by.email) ? newTicket.created_by.id : '');
+    usersToEmail.push(
+      newTicket.created_by && newTicket.created_by.email
+        ? newTicket.created_by.id
+        : ""
+    );
     if (createdFor) {
       usersToNotify.add(`${createdFor}:new`);
       if (newTicket.created_for && newTicket.created_for.email) {
@@ -508,17 +588,21 @@ export async function createTicket(req: Request, res: Response) {
       data: newTicket,
       message: "New ticket created",
       success: true,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
     res.status(201).json({
       message: "Ticket created successfully",
       data: newTicket,
       status: "success",
     });
-    // const formatedTicket = await getFormatedTicketsIdModel(newTicket.id);
-    sendEmail('ticket_created', usersToEmail, `Ticket ${ticketNumber} Created`, newTicket);
-
-
+    const formatedTicket = await getFormatedTicketsIdModel(newTicket.id);
+    await addSLACompliance(formatedTicket);
+    sendEmail(
+      "ticket_created",
+      usersToEmail,
+      `Ticket ${ticketNumber} Created`,
+      newTicket
+    );
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
   }
@@ -527,7 +611,8 @@ export async function createTicket(req: Request, res: Response) {
 export async function getTicketById(req: Request, res: Response) {
   const { id } = req.params;
   try {
-    const result = await db.query(`
+    const result = await db.query(
+      `
       SELECT 
         t.*,
         d.name as department_name,
@@ -550,14 +635,16 @@ export async function getTicketById(req: Request, res: Response) {
       LEFT JOIN users u_assignee ON t.assignee_id = u_assignee.id
       LEFT JOIN users u_owner ON t.created_for = u_owner.id
       WHERE t.id = $1
-    `, [id]);
-    
+    `,
+      [id]
+    );
+
     if (result.rowCount === 0) {
       return res.status(404).json({ message: "Ticket not found" });
     }
-    
+
     const row = result.rows[0];
-    
+
     // Transform the data to include nested objects
     const transformedData = {
       id: row.id,
@@ -569,36 +656,44 @@ export async function getTicketById(req: Request, res: Response) {
       attachments: row.attachments,
       created_at: row.created_at,
       updated_at: row.updated_at,
-      department: row.department_id ? {
-        id: row.department_id,
-        name: row.department_name
-      } : null,
-      category: row.category_id ? {
-        id: row.category_id,
-        name: row.category_name,
-        description: row.category_description
-      } : null,
+      department: row.department_id
+        ? {
+            id: row.department_id,
+            name: row.department_name,
+          }
+        : null,
+      category: row.category_id
+        ? {
+            id: row.category_id,
+            name: row.category_name,
+            description: row.category_description,
+          }
+        : null,
       created_by: {
         id: row.created_by,
         name: row.created_by_name,
-        email: row.created_by_email
+        email: row.created_by_email,
       },
-      created_for: row.owned_by_id ? {
-        id: row.owned_by_id,
-        name: row.owned_by_name,
-        email: row.owned_by_email
-      } : null,
-      assignee: row.assignee_id ? {
-        id: row.assignee_id,
-        name: row.assignee_name,
-        email: row.assignee_email
-      } : null
+      created_for: row.owned_by_id
+        ? {
+            id: row.owned_by_id,
+            name: row.owned_by_name,
+            email: row.owned_by_email,
+          }
+        : null,
+      assignee: row.assignee_id
+        ? {
+            id: row.assignee_id,
+            name: row.assignee_name,
+            email: row.assignee_email,
+          }
+        : null,
     };
-    
+
     res.json({
-      message: '',
+      message: "",
       data: transformedData,
-      status: 'success'
+      status: "success",
     });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
@@ -610,11 +705,11 @@ export async function getTicketActivities(req: Request, res: Response) {
   const { id } = req.params;
   try {
     const result = await getTicketActivitiesModel(id);
-    
+
     res.json({
-      message: '',
+      message: "",
       data: result,
-      status: 'success'
+      status: "success",
     });
   } catch (err) {
     res.status(500).json({ message: "Database error", error: err });
@@ -622,7 +717,7 @@ export async function getTicketActivities(req: Request, res: Response) {
 }
 
 export async function getMonthlyTicketSummary() {
-  const ticketSummary = await getTicketSummaryModel()
+  const ticketSummary = await getTicketSummaryModel();
   return ticketSummary.rows;
 }
 
@@ -635,7 +730,7 @@ export async function getTicketCategoryMonthlySummary() {
   const ticketsByCategory = await getMonthlyTicketCategoryModel();
   const formatedResult: { [key: string]: number[] } = {};
   ticketsByCategory.rows.forEach((row) => {
-    const monthIndex = new Date(row.month + '-01').getMonth(); // Get month index (0-11)
+    const monthIndex = new Date(row.month + "-01").getMonth(); // Get month index (0-11)
     if (!formatedResult[row.category_name]) {
       formatedResult[row.category_name] = new Array(12).fill(0); // Initialize array for 12 months
     }
@@ -646,32 +741,32 @@ export async function getTicketCategoryMonthlySummary() {
 
 export async function getTotalTicketStatusSummary() {
   const ticketSummary = await getTotalTicketStatusModel();
-  return ticketSummary.rows.map(status => ({
+  return ticketSummary.rows.map((status) => ({
     id: status.status_id,
     statusName: status.status_name,
     totalTickets: Number(status.total_tickets),
-    moreThisMonth: status.more_tickets_for_this_status_this_month
+    moreThisMonth: status.more_tickets_for_this_status_this_month,
   }));
 }
 
 export async function getTicketsPerBranchSummary() {
   const result = await getTicketsPerBranchSummaryModel();
-  return result.rows.map(branch => ({
+  return result.rows.map((branch) => ({
     branchId: branch.branch_id,
     branchName: branch.branch_name,
     totalBranchTickets: Number(branch.total_tickets),
-    allBranchesTicketTotal: Number(branch.all_branches_ticket_total)
+    allBranchesTicketTotal: Number(branch.all_branches_ticket_total),
   }));
 }
 
 export async function getLastXTicketsByDateUpdated(limit: number) {
   const result = await getLastXTicketsByDateUpdatedModel(limit);
-  return result.rows.map(ticket => ({
+  return result.rows.map((ticket) => ({
     title: ticket.title,
     category: ticket.category,
     priority: ticket.priority_name,
     status: { name: ticket.status_name, cssClass: ticket.status_css_class },
     createdBy: ticket.created_by,
-    updatedAt: ticket.updated_at
+    updatedAt: ticket.updated_at,
   }));
 }
