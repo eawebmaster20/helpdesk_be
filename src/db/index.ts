@@ -97,9 +97,9 @@ export async function resetDatabase(): Promise<void> {
     // await db.query("DROP TABLE IF EXISTS ticket_statuses CASCADE");
     // await db.query("DROP TABLE IF EXISTS categories CASCADE");
     await db.query("DROP TABLE IF EXISTS ticket_counter CASCADE");
-    await db.query("DROP TABLE IF EXISTS branches CASCADE");
-    await db.query("DROP TABLE IF EXISTS departments CASCADE");
-    await db.query("DROP TABLE IF EXISTS users CASCADE");
+    // await db.query("DROP TABLE IF EXISTS branches CASCADE");
+    // await db.query("DROP TABLE IF EXISTS departments CASCADE");
+    // await db.query("DROP TABLE IF EXISTS users CASCADE");
     console.log("Database reset successfully.");
   } catch (error) {
     console.error("Failed to reset database:", error);
