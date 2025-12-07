@@ -1,7 +1,11 @@
 import { db } from "../db";
 import { FormattedTicket } from "./ticket.model";
 
-export async function createSLAModel(name: string, responseTimeHours: number, resolutionTimeHours: number) {
+export async function createSLAModel(
+  name: string,
+  responseTimeHours: number,
+  resolutionTimeHours: number
+) {
   const result = await db.query(
     `INSERT INTO sla_policies (name, response_time_hours, resolution_time_hours) VALUES ($1, $2, $3) RETURNING *`,
     [name, responseTimeHours, resolutionTimeHours]
@@ -9,15 +13,20 @@ export async function createSLAModel(name: string, responseTimeHours: number, re
   return result.rows[0];
 }
 
-export async function createBulkSLAModel(policies: { name: string; responseTimeHours: number; resolutionTimeHours: number; }[]) {
-  
+export async function createBulkSLAModel(
+  policies: {
+    name: string;
+    responseTimeHours: number;
+    resolutionTimeHours: number;
+  }[]
+) {
   if (!Array.isArray(policies) || policies.length === 0) {
     throw new Error("policies array is required");
   }
-  
+
   try {
     await db.query("BEGIN");
-    
+
     const createdPolicies = [];
     for (const policy of policies) {
       const { name, resolutionTimeHours, responseTimeHours } = policy;
@@ -25,14 +34,14 @@ export async function createBulkSLAModel(policies: { name: string; responseTimeH
         await db.query("ROLLBACK");
         throw new Error("name is required for all policies");
       }
-      
+
       const result = await db.query(
         `INSERT INTO sla_policies (name, response_time_hours, resolution_time_hours) VALUES ($1, $2, $3) RETURNING *`,
         [name, responseTimeHours, resolutionTimeHours]
       );
       createdPolicies.push(result.rows[0]);
     }
-    
+
     await db.query("COMMIT");
     return createdPolicies;
   } catch (err) {
@@ -41,16 +50,23 @@ export async function createBulkSLAModel(policies: { name: string; responseTimeH
   }
 }
 
-
-
-export async function applySLAPolicyToTicket(ticketId: string, slaPolicyId: string): Promise<void> {
-  await db.query(
-    `UPDATE tickets SET sla_policy_id = $1 WHERE id = $2`,
-    [slaPolicyId, ticketId]
-  );
+export async function applySLAPolicyToTicket(
+  ticketId: string,
+  slaPolicyId: string
+): Promise<void> {
+  await db.query(`UPDATE tickets SET sla_policy_id = $1 WHERE id = $2`, [
+    slaPolicyId,
+    ticketId,
+  ]);
 }
 
-export async function updateSLAModel(slaPolicyId: string, name: string, description: string, responseTimeHours: number, resolutionTimeHours: number) {
+export async function updateSLAModel(
+  slaPolicyId: string,
+  name: string,
+  description: string,
+  responseTimeHours: number,
+  resolutionTimeHours: number
+) {
   const result = await db.query(
     `UPDATE sla_policies SET name = $1, description = $2, response_time_hours = $3, resolution_time_hours = $4 WHERE id = $5 RETURNING *`,
     [name, description, responseTimeHours, resolutionTimeHours, slaPolicyId]
@@ -59,36 +75,32 @@ export async function updateSLAModel(slaPolicyId: string, name: string, descript
 }
 
 export async function getAllSLAPoliciesModel() {
-  const result = await db.query(
-    `SELECT * FROM sla_policies`
-  );
+  const result = await db.query(`SELECT * FROM sla_policies`);
   return result.rows;
 }
 
 export async function getSLAPolicyByIdModel(slaPolicyId: string) {
-  const result = await db.query(
-    `SELECT * FROM sla_policies WHERE id = $1`,
-    [slaPolicyId]
-  );
+  const result = await db.query(`SELECT * FROM sla_policies WHERE id = $1`, [
+    slaPolicyId,
+  ]);
   return result.rows[0];
 }
 
-export async function deleteSLAPolicyByIdModel(slaPolicyId: string): Promise<void> {
-  await db.query(
-    `DELETE FROM sla_policies WHERE id = $1`,
-    [slaPolicyId]
-  );
+export async function deleteSLAPolicyByIdModel(
+  slaPolicyId: string
+): Promise<void> {
+  await db.query(`DELETE FROM sla_policies WHERE id = $1`, [slaPolicyId]);
 }
 
 export async function createSLAWithMinutes(
-  name: string, 
-  description: string, 
-  responseTimeMinutes: number, 
+  name: string,
+  description: string,
+  responseTimeMinutes: number,
   resolutionTimeMinutes: number
 ) {
   const responseTimeHours = responseTimeMinutes / 60;
   const resolutionTimeHours = resolutionTimeMinutes / 60;
-  
+
   const result = await db.query(
     `INSERT INTO sla_policies (name, description, response_time_hours, resolution_time_hours) VALUES ($1, $2, $3, $4) RETURNING *`,
     [name, description, responseTimeHours, resolutionTimeHours]
@@ -97,7 +109,8 @@ export async function createSLAWithMinutes(
 }
 
 export async function getTicketSLABreachTimes(ticketId: string) {
-  const result = await db.query(`
+  const result = await db.query(
+    `
     SELECT 
       t.created_at,
       t.status,
@@ -107,8 +120,10 @@ export async function getTicketSLABreachTimes(ticketId: string) {
     FROM tickets t
     LEFT JOIN sla_policies sp ON t.sla_policy_id = sp.id
     WHERE t.id = $1
-  `, [ticketId]);
-  
+  `,
+    [ticketId]
+  );
+
   return result.rows[0];
 }
 
@@ -117,51 +132,69 @@ export async function addSLACompliance(ticket: FormattedTicket): Promise<void> {
   if (!process.env.ACTIVATE_SLA) {
     return;
   }
-  
+
   try {
     const responseMet = await is_response_met(ticket);
     const resolutionMet = await is_resolution_met(ticket);
     console.log({
       responseMet,
-      resolutionMet
-    })
-    await db.query(`
+      resolutionMet,
+    });
+    await db.query(
+      `
     INSERT INTO sla_compliance (ticket_id, sla_policy_id, responded_at, resolved_at, response_met, resolution_met, created_at)
     VALUES ($1, $2, $3, $4, $5, $6, NOW())
-  `, [ticket.id, ticket.sla!.id, null, null, responseMet, resolutionMet]);
+  `,
+      [ticket.id, ticket.sla!.id, null, null, responseMet, resolutionMet]
+    );
   } catch (error) {
-    console.error('Error adding SLA compliance record:', error);
+    console.error("Error adding SLA compliance record:", error);
     throw error;
   }
   return;
 }
 
- async function is_response_met(ticket: FormattedTicket): Promise<boolean> {
-  if (ticket?.status?.name.toLocaleLowerCase() === 'closed' || ticket?.status?.name.toLocaleLowerCase() === 'resolved') {
+export async function updateSLACompliance(
+  ticketId: string,
+  field: "response" | "resolution"
+): Promise<void> {
+  const column = field === "response" ? "responded_at" : "resolved_at";
+  const timestampColumn = field === "response" ? "responded_at" : "resolved_at";
+  const value = await db.query(
+    `
+    UPDATE sla_compliance
+    SET ${column} = NOW(),
+        ${field === "response" ? "response_met" : "resolution_met"} = TRUE
+    WHERE ticket_id = $1
+  `,
+    [ticketId]
+  );
+}
+
+async function is_response_met(ticket: FormattedTicket): Promise<boolean> {
+  if (
+    ticket?.status?.name.toLocaleLowerCase() === "closed" ||
+    ticket?.status?.name.toLocaleLowerCase() === "resolved"
+  ) {
     return true;
   }
   const responseTimeInMinutes = ticket.sla!.response_time_hours * 60;
-  const timeSinceCreated = new Date(ticket.created_at).getTime() - Date.now();
+  const timeSinceCreated = Date.now() - new Date(ticket.created_at).getTime();
   console.log({
     responseTimeInMinutes: responseTimeInMinutes * 60 * 1000,
-    timeSinceCreated
-  })
+    timeSinceCreated,
+  });
   return timeSinceCreated <= responseTimeInMinutes * 60 * 1000;
 }
 
-  async function is_resolution_met(ticket: FormattedTicket): Promise<boolean> {
-    if (ticket?.status?.name.toLocaleLowerCase() === 'closed' || ticket?.status?.name.toLocaleLowerCase() === 'resolved') {
-      return true;
-    }
-    const resolutionTimeInMinutes = ticket.sla!.resolution_time_hours * 60;
-    const timeSinceCreated = new Date(ticket.created_at).getTime() - Date.now();
-    // console.log('--------------------------------------------------------------------------')
-    // console.log({
-    //   resolutionTimeInMinutes: resolutionTimeInMinutes * 60 * 1000,
-    //   now: Date.now(),
-    //   createdAt: new Date(ticket.created_at).getTime(),
-    //   timeSinceCreated
-    // })
-    // console.log('--------------------------------------------------------------------------')
-    return timeSinceCreated <= resolutionTimeInMinutes * 60 * 1000;
+async function is_resolution_met(ticket: FormattedTicket): Promise<boolean> {
+  if (
+    ticket?.status?.name.toLocaleLowerCase() === "closed" ||
+    ticket?.status?.name.toLocaleLowerCase() === "resolved"
+  ) {
+    return true;
   }
+  const resolutionTimeInMinutes = ticket.sla!.resolution_time_hours * 60;
+  const timeSinceCreated = Date.now() - new Date(ticket.created_at).getTime();
+  return timeSinceCreated <= resolutionTimeInMinutes * 60 * 1000;
+}
