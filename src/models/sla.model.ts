@@ -182,17 +182,24 @@ export async function addSLACompliance(ticket: FormattedTicket): Promise<void> {
 
 export async function updateSLACompliance(
   ticketId: string,
-  field: "response" | "resolution"
+  field: "response" | "resolution" | "response_met" | "resolution_met",
+  value?: boolean
 ): Promise<void> {
-  const column = field === "response" ? "responded_at" : "resolved_at";
+  const column =
+    field === "response"
+      ? "responded_at"
+      : field === "resolution"
+      ? "resolved_at"
+      : field;
   // const timestampColumn = field === "response" ? "responded_at" : "resolved_at";
-  const value = await db.query(
+  const payloadValue = typeof value === "boolean" ? value : new Date();
+  const result = await db.query(
     `
     UPDATE sla_compliance
-    SET ${column} = NOW()
+    SET ${column} = $2
     WHERE ticket_id = $1
   `,
-    [ticketId]
+    [ticketId, payloadValue]
   );
 }
 
