@@ -55,7 +55,7 @@ export const generateUserToken = (
     throw new Error("JWT_SECRET is not defined in environment variables");
   }
 
-  return jwt.sign(payload , secret, {
+  return jwt.sign(payload, secret, {
     expiresIn: expiresIn as jwt.SignOptions["expiresIn"],
   });
 };
@@ -69,7 +69,7 @@ export const generateUserRefreshToken = (): string => {
   }
 
   return jwt.sign({}, secret, {
-    expiresIn: process.env.NODE_ENV === "production" ? "1d" : "7m",
+    expiresIn: process.env.NODE_ENV === "production" ? "1d" : "1d",
   });
 };
 
