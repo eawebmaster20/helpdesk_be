@@ -458,6 +458,7 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
         u_assignee.email as assignee_email,
         u_assignee.id as assignee_id,
         p.name as priority_name,
+        p.css_class as priority_class,
         p.id as priority_id,
         p.enabled as priority_enabled,
         s.name as status_name,
@@ -493,7 +494,7 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
       GROUP BY t.id, b.id, b.name, c.id, c.name, c.description,
                u_creator.id, u_creator.name, u_creator.email,
                u_assignee.id, u_assignee.name, u_assignee.email,
-               p.id, p.name, p.enabled,
+               p.id, p.name, p.enabled, p.css_class,
                 s.id, s.name, s.enabled, s.css_class,
                sc.id, sc.response_expire_at, sc.resolution_expire_at, sc.response_met, sc.resolution_met,
                ta_escalation.created_at, u_escalator.id, u_escalator.name, u_escalator.email
@@ -520,6 +521,7 @@ export async function getFormatedL2TicketsModel(assigneeId: string) {
     priority: row.priority_id ? {
       id: row.priority_id,
       name: row.priority_name,
+      cssClass: row.priority_class,
       enabled: row.priority_enabled
     } : null,
     attachments: row.attachments,
