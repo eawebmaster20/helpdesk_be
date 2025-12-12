@@ -70,7 +70,7 @@ export const getTicketCreatedHtmlContent = (ticket: FormattedTicket) => `
                                     <td style="padding: 15px 20px;">
                                         <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
                                             <strong>Need Urgent Assistance?</strong><br>
-                                            For critical issues, please call our help desk at <strong>5003 | 5005 | 5006</strong> or use the live chat feature on our support portal.
+                                            For critical issues, please call our help desk at <strong>5003 | 5005 | 5006</strong>.
                                         </p>
                                     </td>
                                 </tr>
@@ -158,7 +158,7 @@ export const getTicketUpdatedHtmlContent = (ticket: FormattedTicket) => `
                                     <td style="padding: 15px 20px;">
                                         <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
                                             <strong>Need Urgent Assistance?</strong><br>
-                                            For critical issues, please call our help desk at <strong>5003 | 5005 | 5006</strong> or use the live chat feature on our support portal.
+                                            For critical issues, please call our help desk at <strong>5003 | 5005 | 5006</strong>.
                                         </p>
                                     </td>
                                 </tr>
@@ -243,7 +243,7 @@ export const getCommentAddedHtmlContent = (ticket: FormattedTicket, comment: str
                                     <td style="padding: 15px 20px;">
                                         <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
                                             <strong>Need Urgent Assistance?</strong><br>
-                                            For critical issues, please call our help desk at <strong>5003 | 5005 | 5006</strong> or use the live chat feature on our support portal.
+                                            For critical issues, please call our help desk at <strong>5003 | 5005 | 5006</strong>.
                                         </p>
                                     </td>
                                 </tr>
@@ -336,7 +336,7 @@ export const getTicketAssignedHtmlContent = (ticket: FormattedTicket) => `
                                     <td style="padding: 15px 20px;">
                                         <p style="margin: 0; color: #92400e; font-size: 13px; line-height: 1.5;">
                                             <strong>Need Urgent Assistance?</strong><br>
-                                            For critical issues, please call our help desk at <strong>5003 | 5005 | 5006</strong> or use the live chat feature on our support portal.
+                                            For critical issues, please call our help desk at <strong>5003 | 5005 | 5006</strong>.
                                         </p>
                                     </td>
                                 </tr>
