@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS ticket_statuses (
 CREATE TABLE IF NOT EXISTS ticket_priorities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
+  css_class VARCHAR(50),
   enabled BOOLEAN DEFAULT TRUE,
   sla_policy_id UUID REFERENCES sla_policies(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
