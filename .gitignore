@@ -4,4 +4,5 @@ dist
 .github
 .env
 .env-old
+.env.prod
 template.html
