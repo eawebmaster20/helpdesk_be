@@ -2,10 +2,8 @@ import { Server, Socket } from "socket.io";
 import { db } from "../db";
 import { verifyUserToken } from "../middlewares/jwt.utils";
 import {
-  addTicketActivityModel,
   getFormatedL2TicketsModel,
   getFormatedTicketsModel,
-  getMonthlyTicketCategoryModel,
   getTicketActivitiesModel,
   getTotalTicketsModel,
 } from "../models/ticket.model";
@@ -14,12 +12,9 @@ import { io as mainSocketServer } from "../index";
 import {
   getFormatedUsersModel,
   getTotalUserSummaryPayload,
-  getUsersModel,
 } from "../models/users.model";
 import { getFormatedBranchesModel } from "../models/branches.model";
 import { getFormatedDepartmentsModel } from "../models/departments.model";
-import { tickets } from "../storage/memory";
-import { emit } from "process";
 import {
   getLastXTicketsByDateUpdated,
   getMonthlyTicketSummary,
@@ -27,8 +22,8 @@ import {
   getTicketsPerBranchSummary,
   getTotalTicketCategorySummary,
   getTotalTicketStatusSummary,
+  getUserRegistrationByMonth,
 } from "../controllers/tickets.controller";
-import { get } from "http";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -201,6 +196,13 @@ export function newSetupHandlers(io: Server) {
         data: totalUserSummary,
         message: "Total user summary retrieved successfully",
       };
+      
+      const monthlyUserRegistrationSummary = await getUserRegistrationByMonth();
+      const monthlyUserRegistrationSummaryPayload = {
+        success: true,
+        data: monthlyUserRegistrationSummary,
+        message: "Monthly user registration summary retrieved successfully",
+      };
       const ticketsPerBranch = await getTicketsPerBranchSummary();
       const ticketsPerBranchPayload = {
         success: true,
@@ -244,6 +246,11 @@ export function newSetupHandlers(io: Server) {
       );
       emitL3(io, ["tickets:total-per-branch-summary"], ticketsPerBranchPayload);
       emitL3(io, ["tickets:last-5-updated"], last5UpdatedTicketsPayload);
+      emitL3(
+        io,
+        ["users:monthly-registration-summary"],
+        monthlyUserRegistrationSummaryPayload
+      );
     });
 
     socket.on("disconnect", () => {
