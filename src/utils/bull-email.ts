@@ -94,10 +94,15 @@ const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: parseInt(process.env.EMAIL_PORT || "587"),
   secure: parseInt(process.env.EMAIL_PORT || "587") === 465,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
+  auth: process.env.NODE_ENV === "production"
+    ? {
+        user: process.env.PROD_EMAIL_USER,
+        pass: process.env.PROD_EMAIL_PASSWORD,
+      }
+    : {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
 });
 
 emailQueue.process(async (job: any) => {
@@ -133,6 +138,10 @@ export const addEmailToQueue = async (emailJob: EmailJob): Promise<boolean> => {
   }
 
   try {
+    console.log({
+      email: process.env.PROD_EMAIL_USER,
+      emailpassword: process.env.PROD_EMAIL_PASSWORD,
+    })
     console.log("Adding email to queue:", emailJob.to, emailJob.subject);
     await emailQueue.add(emailJob, {
       attempts: 3,
@@ -230,7 +239,7 @@ export const sendEmail = async (
 
     for (const [index, recipient] of userEmails.entries()) {
       await addEmailToQueue({
-        from: process.env.EMAIL_USER || "",
+        from: process.env.NODE_ENV === "production" ? process.env.PROD_EMAIL_USER || "" : process.env.EMAIL_USER || "",
         to: recipient.email,
         subject,
         html: htmlContent,
