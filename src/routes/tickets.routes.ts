@@ -10,7 +10,8 @@ import {
   transitionTicket,
   closeTicket,
   getTicketsByUser,
-  getTicketActivities
+  getTicketActivities,
+  deleteTicket
 } from "../controllers/tickets.controller";
 
 const router = Router();
@@ -46,5 +47,8 @@ router.post("/:id/transition", transitionTicket);
 
 // POST /tickets/:id/link
 router.post("/:id/close", closeTicket);
+
+// Delete /tickets/:id
+router.delete("/:id", deleteTicket);
 
 export default router;
