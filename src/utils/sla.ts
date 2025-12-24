@@ -9,7 +9,6 @@ export async function convertSlaTimeToWorkingHours(
   const now = new Date();
   let breachDate = new Date(now.getTime());
   let remainingHours = Number(slaTimeHours);
-  console.log("-------------------- Converting SLA time:", slaTimeHours, "hours--------------------");
 
   while (remainingHours > 0) {
     // Skip weekends (Saturday = 6, Sunday = 0)
@@ -36,23 +35,11 @@ export async function convertSlaTimeToWorkingHours(
 
     if (remainingHours <= hoursLeftInDay) {
       // Can finish within current working day
-      console.log({
-        breachDate: breachDate.toISOString(),
-        hoursLeftInDay,
-        remainingHours,
-      });
       breachDate.setHours(breachDate.getHours() + remainingHours);
       remainingHours = 0;
     } else {
       // Need to continue to next working day
       remainingHours -= hoursLeftInDay;
-      console.log("--------------------------------------------else start");
-      console.log({
-        breachDate: breachDate.toISOString(),
-        hoursLeftInDay,
-        remainingHours,
-      })
-      console.log("--------------------------------------------else end");
       breachDate.setDate(breachDate.getDate() + 1);
       breachDate.setHours(workingStartHour, 0, 0, 0);
     }
