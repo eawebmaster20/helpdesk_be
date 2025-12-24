@@ -69,18 +69,18 @@ emailQueue.on("failed", (job, err) => {
 });
 
 emailQueue.on("completed", async (job, result) => {
-  console.log(
-    JSON.stringify({
-      level: "info",
-      service: "email-queue",
-      event_type: "job_completed",
-      status: "success",
-      jobId: job.id,
-      email: job.data.to,
-      timestamp: new Date().toISOString(),
-      ticket: job.data.ticket,
-    })
-  );
+  // console.log(
+  //   JSON.stringify({
+  //     level: "info",
+  //     service: "email-queue",
+  //     event_type: "job_completed",
+  //     status: "success",
+  //     jobId: job.id,
+  //     email: job.data.to,
+  //     timestamp: new Date().toISOString(),
+  //     ticket: job.data.ticket,
+  //   })
+  // );
   if (job.data.ticket) {
     try {
       await updateSLACompliance(job.data.ticket.id, "response");
