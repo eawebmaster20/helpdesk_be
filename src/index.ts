@@ -31,13 +31,20 @@ const httpServer = createServer(app);
 // Setup Socket.IO with CORS
 const io = new Server(httpServer, {
   cors: {
-    origin:
-      process.env.NODE_ENV === "production"
-        ? [process.env.FRONTEND_URL || "https://yourdomain.com"]
-        : "*", // Allow all origins for development; restrict in production
+    origin: process.env.CORS_ORIGIN,
     credentials: true,
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Authorization", "Content-Type"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "DNT",
+      "User-Agent",
+      "X-Requested-With",
+      "If-Modified-Since",
+      "Cache-Control",
+      "Content-Type",
+      "Range",
+      "Authorization",
+    ],
+    exposedHeaders: ["Content-Length", "Content-Range"],
   },
 });
 
@@ -48,10 +55,20 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(
   cors({
-    origin: "*", // Allow all origins for development; restrict in production
+    origin: process.env.CORS_ORIGIN,
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "DNT",
+      "User-Agent",
+      "X-Requested-With",
+      "If-Modified-Since",
+      "Cache-Control",
+      "Content-Type",
+      "Range",
+      "Authorization",
+    ],
+    exposedHeaders: ["Content-Length", "Content-Range"],
   })
 );
 // implement a rubust logging for every request
@@ -120,7 +137,7 @@ app.get("/test-email", async (req: Request, res: Response) => {
   try {
     // Simulate sending a test email
     const emailSent = await addEmailToQueue({
-      from: process.env.EMAIL_USER || "",
+      from: process.env.PROD_EMAIL_USER || "",
       to: req.body.to,
       subject: `Ticket Created`,
       text: `Your ticket has been created with ticket number.`,
@@ -158,7 +175,7 @@ app.use(
   }
 );
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 // app.listen(PORT, () => {
 //   console.log(`Server running on port ${PORT}`);
 // });
