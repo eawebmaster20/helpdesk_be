@@ -5,4 +5,5 @@ dist
 .env
 .env-old
 .env.prod
+.env.test
 template.html
