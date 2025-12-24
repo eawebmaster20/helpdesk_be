@@ -9,6 +9,7 @@ export async function convertSlaTimeToWorkingHours(
   const now = new Date();
   let breachDate = new Date(now.getTime());
   let remainingHours = slaTimeHours;
+  console.log("-------------------- Converting SLA time:", slaTimeHours, "hours--------------------");
 
   while (remainingHours > 0) {
     // Skip weekends (Saturday = 6, Sunday = 0)
