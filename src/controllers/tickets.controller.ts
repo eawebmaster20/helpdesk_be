@@ -28,6 +28,7 @@ import { sendEmail } from "../utils/bull-email";
 import { applySLAPolicyToTicket } from "./sla.controller";
 import { addSLACompliance, updateSLACompliance } from "../models/sla.model";
 import { getAllStatusesModel } from "../models/statuses.model";
+import { getmonthlyUserRegistrationSummaryPayload } from "../models/users.model";
 
 export async function updateTicket(req: Request, res: Response) {
   const { id } = req.params;
@@ -739,6 +740,37 @@ export async function getTicketCategoryMonthlySummary() {
   return Object.entries(formatedResult).map(([name, data]) => ({ name, data }));
 }
 
+//  Get the last six monthly user registration summary
+export async function getUserRegistrationByMonth() {
+  const usersByMonth = await getmonthlyUserRegistrationSummaryPayload();
+    const { rows } = usersByMonth;
+
+// Map DB results for fast lookup
+const monthMap = new Map(
+  rows.map(r => [r.month, Number(r.user_count)])
+);
+
+// Generate last 6 months (oldest → newest)
+const months: string[] = [];
+const now = new Date();
+
+for (let i = 5; i >= 0; i--) {
+  const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+  const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  months.push(month);
+}
+
+// Build chart data
+const xAxisData = months;
+const yAxisData = months.map(m => monthMap.get(m) ?? 0);
+
+return {
+  xAxisData,
+  yAxisData
+};
+  
+}
+
 export async function getTotalTicketStatusSummary() {
   const ticketSummary = await getTotalTicketStatusModel();
   return ticketSummary.rows.map((status) => ({
@@ -769,4 +801,26 @@ export async function getLastXTicketsByDateUpdated(limit: number) {
     createdBy: ticket.created_by,
     updatedAt: ticket.updated_at,
   }));
+}
+
+export async function deleteTicket(req: Request, res: Response) {
+  const { id } = req.params;
+  try {
+    const result = await db.query("DELETE FROM tickets WHERE id = $1", [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+    // delete related activities
+    const activitiesResult = await db.query("DELETE FROM ticket_activities WHERE ticket_id = $1", [id]);
+    if (activitiesResult.rowCount === 0) {
+      console.log("No related ticket activities found to delete.");
+    }
+    res.json({
+      message: "Ticket deleted successfully",
+      data: null,
+      status: "success",
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Database error", error: err });
+  }
 }
