@@ -45,19 +45,19 @@ async function checkSLACompliance(): Promise<void> {
         "resolution_met",
         resolutionMet
       );
-      console.log({
-        // ...ticket,
-        responded_at:  ticket.responded_at
-        ? new Date(ticket.responded_at).getTime()
-        : null,
-        resolved_at: ticket.resolved_at
-        ? new Date(ticket.resolved_at).getTime()
-        : null,
-        createdAt,
-        responseTimeMs:ticket.sla_policy?.response_time_hours * 60 * 60 * 1000,
-        responseMet,
-        resolutionMet,
-      })
+      // console.log({
+      //   // ...ticket,
+      //   responded_at:  ticket.responded_at
+      //   ? new Date(ticket.responded_at).getTime()
+      //   : null,
+      //   resolved_at: ticket.resolved_at
+      //   ? new Date(ticket.resolved_at).getTime()
+      //   : null,
+      //   createdAt,
+      //   responseTimeMs:ticket.sla_policy?.response_time_hours * 60 * 60 * 1000,
+      //   responseMet,
+      //   resolutionMet,
+      // })
     }
 
     console.log(`[${new Date().toISOString()}] SLA compliance check completed`);
