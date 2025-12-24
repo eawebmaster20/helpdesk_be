@@ -213,3 +213,15 @@ export async function getTotalUserSummaryPayload() {
   };
   return formatedResult;
 }
+
+export async function getmonthlyUserRegistrationSummaryPayload() {
+  const usersByMonth = await db.query(`
+    SELECT
+      TO_CHAR(created_at, 'YYYY-MM') AS month,
+      COUNT(*) AS user_count
+    FROM users
+    GROUP BY month
+    ORDER BY month;
+  `);
+return usersByMonth
+}
